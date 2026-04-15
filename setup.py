@@ -24,9 +24,9 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'node_debug = hsm_robot.debug.debug:main',
-            'node_timer = hsm_robot.timer.timer:main',
-            'node_navigation = hsm_robot.navigation.navigation:main',            
+            'hsm_ros_debug_node = hsm_robot.debug.debug:main',
+            'hsm_ros_timer_node = hsm_robot.timer.timer:main',
+            'hsm_ros_navigation_node = hsm_robot.navigation.navigation:main',            
         ],
     },
 )

@@ -41,3 +41,12 @@ class ROSDebug(rclpy.node.Node):
         self.get_logger().info('Debug.print: {}'.format(request.s))        
         response.ok = True
         return response
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = ROSDebug()
+    rclpy.spin(node)
+    rclpy.shutdown()
+
+if __name__ == "__main__":
+    main()

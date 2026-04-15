@@ -71,3 +71,11 @@ class ROSNavigation(rclpy.node.Node):
         response.ok = True
         return response
 
+def main(args=None):
+    rclpy.init(args=args)
+    node = ROSNavigation()
+    rclpy.spin(node)
+    rclpy.shutdown()
+
+if __name__ == "__main__":
+    main()
