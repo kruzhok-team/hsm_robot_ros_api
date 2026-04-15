@@ -21,6 +21,7 @@
 # -----------------------------------------------------------------------------
 
 import rclpy
+import rclpy.node
 
 import hsm_interfaces.srv
 
