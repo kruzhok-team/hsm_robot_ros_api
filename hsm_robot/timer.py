@@ -35,22 +35,22 @@ class ROSTimer(rclpy.node.Node):
     STOP_SERVICE = 'hsm_ros_timer_stop'
 
     def __init__(self):
-        rclpy.node.Node.__init__(self.OBJECT_NAME)
-        self.__msg_publisher = self.__node.create_publisher(hsm_interfaces.msg.SimpleMessage,
-                                                            hsm_robot.constants.MESSAGES_TOPIC,
-                                                            hsm_robot.constants.QUEUE_LEN)
-        self.__service_tick = self.__node.create_service(hsm_interfaces.srv.TimerTick,
-                                                          self.TICK_SERVICE,
-                                                          self.on_init_ticks_call)
-        self.__service_start = self.__node.create_service(hsm_interfaces.srv.TimerStart,
-                                                          self.START_SERVICE,
-                                                          self.on_start_call)
-        self.__service_stop = self.__node.create_service(hsm_interfaces.srv.TimerStop,
-                                                          self.STOP_SERVICE,
-                                                          self.on_stop_call)
+        rclpy.node.Node.__init__(self, self.OBJECT_NAME)
+        self.__msg_publisher = self.create_publisher(hsm_interfaces.msg.SimpleMessage,
+                                                     hsm_robot.constants.MESSAGES_TOPIC,
+                                                     hsm_robot.constants.QUEUE_LEN)
+        self.__service_tick = self.create_service(hsm_interfaces.srv.TimerTick,
+                                                  self.TICK_SERVICE,
+                                                  self.on_init_ticks_call)
+        self.__service_start = self.create_service(hsm_interfaces.srv.TimerStart,
+                                                   self.START_SERVICE,
+                                                   self.on_start_call)
+        self.__service_stop = self.create_service(hsm_interfaces.srv.TimerStop,
+                                                  self.STOP_SERVICE,
+                                                  self.on_stop_call)
         # TODO: additional initialization
         # ...
-        self.__node.get_logger().info('ROSTimer service node initialized')
+        self.get_logger().info('ROSTimer service node initialized')
 
     def __tick_timer_callback(self):
         msg = hsm_interfaces.msg.SimpleMessage()

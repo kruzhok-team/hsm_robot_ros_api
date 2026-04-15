@@ -31,10 +31,10 @@ class ROSDebug(rclpy.node.Node):
     PRINT_SERVICE = 'hsm_ros_debug_print'
     
     def __init__(self):
-        rclpy.node.Node.__init__(self.OBJECT_NAME)
-        self.__service_print = self.__node.create_service(hsm_interfaces.srv.DebugPrint,
-                                                          self.PRINT_SERVICE,
-                                                          self.on_print_call)
+        rclpy.node.Node.__init__(self, self.OBJECT_NAME)
+        self.__service_print = self.create_service(hsm_interfaces.srv.DebugPrint,
+                                                   self.PRINT_SERVICE,
+                                                   self.on_print_call)
         self.get_logger().info('ROSDebug service node initialized')
 
     def on_print_call(self, request, response):
