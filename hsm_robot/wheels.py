@@ -91,7 +91,7 @@ class ROSWheels(rclpy.node.Node):
         # Wheels.turn_right implementation
         self.get_logger().info('Wheels.turn_right()')
         msg = Twist()
-        msg.angular.x = request.w
+        msg.angular.z = request.w
         self.__twist_publisher.publish(msg)
         response.ok = True
         return response
@@ -100,7 +100,7 @@ class ROSWheels(rclpy.node.Node):
         # Wheels.turn_left implementation
         self.get_logger().info('Wheels.turn_left()')
         msg = Twist()
-        msg.angular.x = -request.w
+        msg.angular.z = -request.w
         self.__twist_publisher.publish(msg)
         response.ok = True
         return response
