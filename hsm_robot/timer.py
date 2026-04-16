@@ -38,7 +38,7 @@ class ROSTimer(rclpy.node.Node):
         rclpy.node.Node.__init__(self, self.OBJECT_NAME)
         self.__msg_publisher = self.create_publisher(hsm_interfaces.msg.SimpleMessage,
                                                      hsm_robot.constants.MESSAGES_TOPIC,
-                                                     hsm_robot.constants.QUEUE_LEN)
+                                                     hsm_robot.constants.MSG_QUEUE_LEN)
         self.__service_tick = self.create_service(hsm_interfaces.srv.TimerTick,
                                                   self.TICK_SERVICE,
                                                   self.on_init_ticks_call)
