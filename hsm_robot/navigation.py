@@ -33,7 +33,7 @@ class ROSNavigation(rclpy.node.Node):
     MOVE_TO_POINT_SERVICE = 'hsm_ros_navigation_move_to_point'
     STOP_SERVICE = 'hsm_ros_navigation_stop'
     NAVIGATION_MODULE_TOPIC = "/goal_pose"
-    STOP_MESSAGE_FRAME_ID = "CANCEL_NAV"
+    STOP_MESSAGE_FRAME_ID = "__CANCEL_NAV__"
 
     def __init__(self):
         rclpy.node.Node.__init__(self, self.OBJECT_NAME)
