@@ -85,7 +85,7 @@ class ROSTimer(rclpy.node.Node):
 
     def on_start_call(self, request, response):
         # Timer.start implementation
-        period = request.timeout / 1000.0 # convert to seconds
+        period = request.timeout
         repeat = request.repeat
         self.get_logger().info('Timer.start({}, {})'.format(period, repeat))
         # TODO: start timer
