@@ -23,7 +23,7 @@
 import rclpy
 import rclpy.node
 
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, Odometry
 
 import hsm_robot.constants
 import hsm_interfaces.msg
@@ -51,13 +51,19 @@ class ROSNavigation(rclpy.node.Node):
         self.__goal_publisher = self.create_publisher(PoseStamped,
                                                       self.NAVIGATION_MODULE_TOPIC,
                                                       hsm_robot.constants.QUEUE_LEN)
-
+        self.__odom_subscriber = self.create_subscription(Odometry,
+                                                          hsm_robot.constants.ODOMETRY_TOPIC,
+                                                          self.odom_callback,
+                                                          MSG_QUEUE_LEN)
         self.get_logger().info('ROSNavigation service node initialized')
 
     def __path_found(self):
         msg = hsm_interfaces.msg.SimpleMessage()        
         msg.code = hsm_interfaces.msg.SimpleMessage.MSG_NAVIGATION_PATH_FOUND
         self.__msg_publisher.publish(msg)        
+
+    def odom_callback(self, msg):
+        # process odometry
 
     def on_move_to_point_call(self, request, response):
         # Navigation.move_to_point implementation

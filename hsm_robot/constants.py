@@ -22,6 +22,7 @@
 # -----------------------------------------------------------------------------
 
 MESSAGES_TOPIC = '/hsm_ros_msg' # the ROS2 topic for HSM messages
+ODOMETRY_TOPIC = '/odom'        # the ROS2 odometry topic 
 FRAME_ID = 'hsm_ros_api'        # the ROS2 frame for HSM messages
 MSG_QUEUE_LEN = 10              # the ROS2 messages queue length
 LOOP_TIME = 0.05                # loop timer
