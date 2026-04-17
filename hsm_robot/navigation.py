@@ -60,10 +60,11 @@ class ROSNavigation(rclpy.node.Node):
     def __path_found(self):
         msg = hsm_interfaces.msg.SimpleMessage()        
         msg.code = hsm_interfaces.msg.SimpleMessage.MSG_NAVIGATION_PATH_FOUND
-        self.__msg_publisher.publish(msg)        
+        self.__msg_publisher.publish(msg)
 
     def odom_callback(self, msg):
         # process odometry
+        pass
 
     def on_move_to_point_call(self, request, response):
         # Navigation.move_to_point implementation
