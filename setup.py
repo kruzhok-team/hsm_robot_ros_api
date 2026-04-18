@@ -27,6 +27,7 @@ setup(
             'debug_node = hsm_robot.debug:main',
             'timer_node = hsm_robot.timer:main',
             'navigation_node = hsm_robot.navigation:main',            
+            'wheels_node = hsm_robot.wheels:main',
         ],
     },
 )

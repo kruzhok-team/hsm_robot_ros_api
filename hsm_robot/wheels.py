@@ -108,7 +108,7 @@ class ROSWheels(rclpy.node.Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = ROSNavigation()
+    node = ROSWheels()
     rclpy.spin(node)
     rclpy.shutdown()
 
