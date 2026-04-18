@@ -51,11 +51,11 @@ class ROSNavigation(rclpy.node.Node):
                                                   self.on_stop_call)
         self.__goal_publisher = self.create_publisher(PoseStamped,
                                                       self.NAVIGATION_MODULE_TOPIC,
-                                                      hsm_robot.constants.QUEUE_LEN)
+                                                      hsm_robot.constants.MSG_QUEUE_LEN)
         self.__odom_subscriber = self.create_subscription(Odometry,
                                                           hsm_robot.constants.ODOMETRY_TOPIC,
                                                           self.odom_callback,
-                                                          MSG_QUEUE_LEN)
+                                                          hsm_robot.constants.MSG_QUEUE_LEN)
         self.get_logger().info('ROSNavigation service node initialized')
 
     def __path_found(self):
