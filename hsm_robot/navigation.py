@@ -23,7 +23,8 @@
 import rclpy
 import rclpy.node
 
-from geometry_msgs.msg import PoseStamped, Odometry
+from geometry_msgs.msg import PoseStamped
+from nav_msgs.msg import Odometry
 
 import hsm_robot.constants
 import hsm_interfaces.msg
