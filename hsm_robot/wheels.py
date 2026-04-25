@@ -1,7 +1,7 @@
 # -----------------------------------------------------------------------------
 # The Cyberiada HSM-to-ROS2 library
 #
-# The ROS2 navigation module implementation
+# The ROS2 wheels module implementation
 #
 # Copyright (C) 2026 Anastasia Viktorova <viktorovaa.04@gmail.com>
 #
