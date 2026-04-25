@@ -58,7 +58,7 @@ class ROSWheels(rclpy.node.Node):
                                                        self.on_turn_left_call)
         self.__twist_publisher = self.create_publisher(Twist,
                                                        self.VELOCITY_TOPIC,
-                                                       hsm_robot.constants.QUEUE_LEN)
+                                                       hsm_robot.constants.MSG_QUEUE_LEN)
 
         self.get_logger().info('ROSWheels service node initialized')
 
@@ -92,7 +92,7 @@ class ROSWheels(rclpy.node.Node):
         # Wheels.turn_right implementation
         self.get_logger().info('Wheels.turn_right({})'.format(request.w))
         msg = Twist()
-        msg.angular.z = request.w
+        msg.angular.z = -request.w
         self.__twist_publisher.publish(msg)
         response.ok = True
         return response
@@ -101,7 +101,7 @@ class ROSWheels(rclpy.node.Node):
         # Wheels.turn_left implementation
         self.get_logger().info('Wheels.turn_left({})'.format(request.w))
         msg = Twist()
-        msg.angular.z = -request.w
+        msg.angular.z = request.w
         self.__twist_publisher.publish(msg)
         response.ok = True
         return response

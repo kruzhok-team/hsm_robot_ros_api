@@ -48,8 +48,7 @@ class ROSTimer(rclpy.node.Node):
         self.__service_stop = self.create_service(hsm_interfaces.srv.TimerStop,
                                                   self.STOP_SERVICE,
                                                   self.on_stop_call)
-        # TODO: additional initialization
-        # ...
+        self._timer_repetable = False
         self.get_logger().info('ROSTimer service node initialized')
 
     def __tick_timer_callback(self):
@@ -59,26 +58,29 @@ class ROSTimer(rclpy.node.Node):
 
     def __second_timer_callback(self):
         msg = hsm_interfaces.msg.SimpleMessage()
-        msg.code = hsm_interfaces.msg.SimpleMessage.MSG_TIMER_1SEC
+        msg.code = hsm_interfaces.msg.SimpleMessage.MSG_TIMER_TICK_1S
         self.__msg_publisher.publish(msg)
 
     def __minute_timer_callback(self):
         msg = hsm_interfaces.msg.SimpleMessage()        
-        msg.code = hsm_interfaces.msg.SimpleMessage.MSG_TIMER_1MIN
+        msg.code = hsm_interfaces.msg.SimpleMessage.MSG_TIMER_TICK_1M
         self.__msg_publisher.publish(msg)
 
     def __timer_elapsed(self):
         msg = hsm_interfaces.msg.SimpleMessage()        
         msg.code = hsm_interfaces.msg.SimpleMessage.MSG_TIMER_ELAPSED
-        self.__msg_publisher.publish(msg)        
+        self.__msg_publisher.publish(msg)
 
-    def on_init_ticks_call(self, request, resonse):
+        if(self._timer_repetable == False):
+            self.destroy_timer(self._timer)
+
+    def on_init_ticks_call(self, request, response):
         # Start standard timers
-        if request.run_tick:
+        if request.run_ticks:
             self.__tick_timer = self.create_timer(hsm_robot.constants.TICK_LEN, self.__tick_timer_callback)
-        if request.run_tick_1sec:
+        if request.run_ticks_1sec:
             self.__second_timer = self.create_timer(1.0, self.__second_timer_callback)
-        if request.run_tick_1min:
+        if request.run_ticks_1min:
             self.__minute_timer = self.create_timer(60.0, self.__minute_timer_callback)
         response.ok = True
         return response
@@ -88,16 +90,16 @@ class ROSTimer(rclpy.node.Node):
         period = request.timeout
         repeat = request.repeat
         self.get_logger().info('Timer.start({}, {})'.format(period, repeat))
-        # TODO: start timer
-        # ...
+        self._timer_repetable = repeat
+        self._timer = self.create_timer(period, self.__timer_elapsed)
         response.ok = True
         return response
 
     def on_stop_call(self, request, response):
         # Timer.stop implementation
         self.get_logger().info('Timer.stop()')
-        # TODO: stop timer
-        # ...
+        self._timer_repetable = False
+        self.destroy_timer(self._timer)
         response.ok = True
         return response
 
