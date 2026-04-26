@@ -48,7 +48,8 @@ class ROSTimer(rclpy.node.Node):
         self.__service_stop = self.create_service(hsm_interfaces.srv.TimerStop,
                                                   self.STOP_SERVICE,
                                                   self.on_stop_call)
-        self._timer_repetable = False
+        self.__timer = None
+        self.__timer_repeatable = False
         self.get_logger().info('ROSTimer service node initialized')
 
     def __tick_timer_callback(self):
@@ -70,9 +71,9 @@ class ROSTimer(rclpy.node.Node):
         msg = hsm_interfaces.msg.SimpleMessage()        
         msg.code = hsm_interfaces.msg.SimpleMessage.MSG_TIMER_ELAPSED
         self.__msg_publisher.publish(msg)
-
-        if(self._timer_repetable == False):
-            self.destroy_timer(self._timer)
+        if not self.__timer_repeatable:
+            self.destroy_timer(self.__timer)
+            self.__timer = None
 
     def on_init_ticks_call(self, request, response):
         # Start standard timers
@@ -90,16 +91,20 @@ class ROSTimer(rclpy.node.Node):
         period = request.timeout
         repeat = request.repeat
         self.get_logger().info('Timer.start({}, {})'.format(period, repeat))
-        self._timer_repetable = repeat
-        self._timer = self.create_timer(period, self.__timer_elapsed)
+        if self.__timer:
+            self.destroy_timer(self.__timer)
+        self.__timer_repeatable = repeat
+        self.__timer = self.create_timer(period, self.__timer_elapsed)
         response.ok = True
         return response
 
     def on_stop_call(self, request, response):
         # Timer.stop implementation
         self.get_logger().info('Timer.stop()')
-        self._timer_repetable = False
-        self.destroy_timer(self._timer)
+        if self.__timer is not None:
+            self.__timer_repetable = False
+            self.destroy_timer(self.__timer)
+            self.__timer = None
         response.ok = True
         return response
 
