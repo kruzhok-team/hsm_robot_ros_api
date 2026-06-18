@@ -25,6 +25,7 @@ import rclpy.node
 
 from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import Odometry
+from sensor_msgs.msg import LaserScan
 
 import hsm_robot.constants
 import hsm_interfaces.msg
@@ -37,6 +38,10 @@ class ROSNavigation(rclpy.node.Node):
     STOP_SERVICE = 'hsm_ros_navigation_stop'
     NAVIGATION_MODULE_TOPIC = '/goal_pose'
     STOP_MESSAGE_FRAME_ID = '__CANCEL_NAV__'
+    OBSTACLE_RANGE = 0.45
+    OPEN_SPACE_RANGE = 0.5
+    LINEAR_SPEED_THRESHOLD = 0.001
+    ANGULAR_SPEED_THRESHOLD = 0.001
 
     def __init__(self):
         rclpy.node.Node.__init__(self, self.OBJECT_NAME)
@@ -56,6 +61,10 @@ class ROSNavigation(rclpy.node.Node):
                                                           hsm_robot.constants.ODOMETRY_TOPIC,
                                                           self.odom_callback,
                                                           hsm_robot.constants.MSG_QUEUE_LEN)
+        self.__scan_subscriber = self.create_subscription(LaserScan,
+                                                          hsm_robot.constants.LASER_TOPIC,
+                                                          self.scan_callback,
+                                                          hsm_robot.constants.MSG_QUEUE_LEN)
         self.get_logger().info('ROSNavigation service node initialized')
 
     def __path_found(self):
@@ -65,7 +74,47 @@ class ROSNavigation(rclpy.node.Node):
 
     def odom_callback(self, msg):
         # process odometry
-        pass
+        vx = msg.twist.twist.linear.x
+        vy = msg.twist.twist.linear.y
+        vth = msg.twist.twist.linear.z
+        wx = msg.twist.twist.angular.x
+        wy = msg.twist.twist.angular.y
+        wz = msg.twist.twist.angular.z
+        # self.get_logger().info(f"vx={vx:.2f} vy={vy:.2f} vth={vth:.2f} wx={wx:.2f} wy={wy:.2f} wz={wz:.2f}")
+        if abs(vx) < self.LINEAR_SPEED_THRESHOLD and \
+            abs(vy) < self.LINEAR_SPEED_THRESHOLD and \
+            abs(vth) < self.LINEAR_SPEED_THRESHOLD and \
+            abs(wx) < self.ANGULAR_SPEED_THRESHOLD and \
+            abs(wy) < self.ANGULAR_SPEED_THRESHOLD and \
+            abs(wz) < self.ANGULAR_SPEED_THRESHOLD:
+            msg = hsm_interfaces.msg.SimpleMessage()
+            msg.code = hsm_interfaces.msg.SimpleMessage.MSG_NAVIGATION_STOP_COMPLETED
+            self.__msg_publisher.publish(msg)
+            self.get_logger().info('ROSNavigation MSG_NAVIGATION_STOP_COMPLETED')
+
+    def scan_callback(self, msg):
+        # process laser scan
+        size = len(msg.ranges)
+        center_dist = msg.ranges[size // 2]
+        right_dist = msg.ranges[0]
+        self.get_logger().info(f"cent={center_dist:.2f} right={right_dist:.2f}")
+
+        if right_dist > self.OPEN_SPACE_RANGE:
+            msg = hsm_interfaces.msg.SimpleMessage()
+            msg.code = hsm_interfaces.msg.SimpleMessage.MSG_NAVIGATION_RIGHT_OPEN_SPACE
+            self.__msg_publisher.publish(msg)
+            self.get_logger().info('ROSNavigation MSG_NAVIGATION_RIGHT_OPEN_SPACE')
+
+        if center_dist < self.OBSTACLE_RANGE / 3:
+            msg = hsm_interfaces.msg.SimpleMessage()        
+            msg.code = hsm_interfaces.msg.SimpleMessage.MSG_NAVIGATION_COLLISION_DETECTED
+            self.__msg_publisher.publish(msg)
+            self.get_logger().info('ROSNavigation MSG_NAVIGATION_COLLISION_DETECTED')
+        elif center_dist < self.OBSTACLE_RANGE:
+            msg = hsm_interfaces.msg.SimpleMessage()
+            msg.code = hsm_interfaces.msg.SimpleMessage.MSG_NAVIGATION_COLLISION_WARNING
+            self.__msg_publisher.publish(msg)
+            self.get_logger().info('ROSNavigation MSG_NAVIGATION_COLLISION_WARNING')
 
     def on_move_to_point_call(self, request, response):
         # Navigation.move_to_point implementation
