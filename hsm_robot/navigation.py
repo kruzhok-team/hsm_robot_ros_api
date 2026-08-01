@@ -3,6 +3,7 @@
 #
 # The ROS2 navigation module implementation
 #
+# Copyright (C) 2026 Alexey Fedoseev <aleksey@fedoseev.net>
 # Copyright (C) 2026 Anastasia Viktorova <viktorovaa.04@gmail.com>
 #
 # This program is free software; you can redistribute it and/or
@@ -66,6 +67,7 @@ class ROSNavigation(rclpy.node.Node):
                                                           self.scan_callback,
                                                           hsm_robot.constants.MSG_QUEUE_LEN)
         self.get_logger().info('ROSNavigation service node initialized')
+        self.__stopped = False
 
     def __path_found(self):
         msg = hsm_interfaces.msg.SimpleMessage()        
@@ -87,10 +89,15 @@ class ROSNavigation(rclpy.node.Node):
             abs(wx) < self.ANGULAR_SPEED_THRESHOLD and \
             abs(wy) < self.ANGULAR_SPEED_THRESHOLD and \
             abs(wz) < self.ANGULAR_SPEED_THRESHOLD:
-            msg = hsm_interfaces.msg.SimpleMessage()
-            msg.code = hsm_interfaces.msg.SimpleMessage.MSG_NAVIGATION_STOP_COMPLETED
-            self.__msg_publisher.publish(msg)
-            self.get_logger().info('ROSNavigation MSG_NAVIGATION_STOP_COMPLETED')
+
+            if not self.__stopped:
+                msg = hsm_interfaces.msg.SimpleMessage()
+                msg.code = hsm_interfaces.msg.SimpleMessage.MSG_NAVIGATION_STOP_COMPLETED
+                self.__msg_publisher.publish(msg)
+                self.get_logger().info('ROSNavigation MSG_NAVIGATION_STOP_COMPLETED')                
+                self.__stopped = True
+        else:
+            self.__stopped = False
 
     def scan_callback(self, msg):
         # process laser scan
