@@ -14,18 +14,18 @@ Here is the architectural scheme of the API implementation:
 
      hsm_controller.py                   navigation_caller.py                          navigation.py
     +----------------+                  +-------------------+                       +-----------------+
-	|                | --- methods ---> |    Navigation     | --- service call ---> | Navigation Node |
+    |                | --- methods ---> |    Navigation     | --- service call ---> | Navigation Node |
     |                | <-- events ----- | (the caller node) | <-- service result -- |  (ROS2 impl.)   |
     |                |                  +-------------------+                       +-----------------+
     | HSM Controller |
-	|      Node      |                    wheels_caller.py
-	|                |                  +-------------------+
-	|   (based on    | --- methods ---> |      Wheels       | --- ...
-	|  HSM diagram)  | <-- events ----- | (the caller node) | <-- ...
+    |      Node      |                    wheels_caller.py
+    |                |                  +-------------------+
+    |   (based on    | --- methods ---> |      Wheels       | --- ...
+    |  HSM diagram)  | <-- events ----- | (the caller node) | <-- ...
     |                |                  +-------------------+
     |                |
-	|                |      ...
-	+----------------+
+    |                |      ...
+    +----------------+
 
 For instance, the code incorporated into the HSM diagram calls a method from the
 `Navigation` object. This call is proxied through the ROS2 service call to the dedicated
@@ -53,3 +53,4 @@ this implementation:
 
 * `/cmd_vel`
 * `/odom`
+
