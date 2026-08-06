@@ -3,6 +3,7 @@
 #
 # The ROS2 timer module implementation
 #
+# Copyright (C) 2026 Alexey Fedoseev <aleksey@fedoseev.net>
 # Copyright (C) 2026 Anastasia Viktorova <viktorovaa.04@gmail.com>
 #
 # This program is free software; you can redistribute it and/or
@@ -19,6 +20,8 @@
 # along with this program. If not, see https://www.gnu.org/licenses/
 #
 # -----------------------------------------------------------------------------
+
+from functools import partial
 
 import rclpy
 import rclpy.node
@@ -39,6 +42,9 @@ class ROSTimer(rclpy.node.Node):
         self.__msg_publisher = self.create_publisher(hsm_interfaces.msg.SimpleMessage,
                                                      hsm_robot.constants.MESSAGES_TOPIC,
                                                      hsm_robot.constants.MSG_QUEUE_LEN)
+        self.__str_msg_publisher = self.create_publisher(hsm_interfaces.msg.StringArgMessage,
+                                                         hsm_robot.constants.STR_MESSAGES_TOPIC,
+                                                         hsm_robot.constants.MSG_QUEUE_LEN)
         self.__service_tick = self.create_service(hsm_interfaces.srv.TimerTicks,
                                                   self.TICK_SERVICE,
                                                   self.on_init_ticks_call)
@@ -48,8 +54,8 @@ class ROSTimer(rclpy.node.Node):
         self.__service_stop = self.create_service(hsm_interfaces.srv.TimerStop,
                                                   self.STOP_SERVICE,
                                                   self.on_stop_call)
-        self.__timer = None
-        self.__timer_repeatable = False
+        self.__timers = {}
+        self.__timers_repeatable = {}
         self.get_logger().info('ROSTimer service node initialized')
 
     def __tick_timer_callback(self):
@@ -67,13 +73,13 @@ class ROSTimer(rclpy.node.Node):
         msg.code = hsm_interfaces.msg.SimpleMessage.MSG_TIMER_TICK_1M
         self.__msg_publisher.publish(msg)
 
-    def __timer_elapsed(self):
-        msg = hsm_interfaces.msg.SimpleMessage()        
-        msg.code = hsm_interfaces.msg.SimpleMessage.MSG_TIMER_ELAPSED
-        self.__msg_publisher.publish(msg)
-        if not self.__timer_repeatable:
-            self.destroy_timer(self.__timer)
-            self.__timer = None
+    def __timer_elapsed(self, name):
+        msg = hsm_interfaces.msg.StringArgMessage()        
+        msg.code = hsm_interfaces.msg.StringArgMessage.MSG_TIMER_ELAPSED
+        msg.arg = name
+        self.__str_msg_publisher.publish(msg)
+        if not self.__timer_repeatable[name]:
+            self.__destroy_timer(name)
 
     def on_init_ticks_call(self, request, response):
         # Start standard timers
@@ -90,24 +96,28 @@ class ROSTimer(rclpy.node.Node):
         # Timer.start implementation
         period = request.timeout
         repeat = request.repeat
-        self.get_logger().info('Timer.start({}, {})'.format(period, repeat))
-        if self.__timer:
-            self.destroy_timer(self.__timer)
-        self.__timer_repeatable = repeat
-        self.__timer = self.create_timer(period, self.__timer_elapsed)
+        name = request.name
+        self.get_logger().info('Timer.start({}, {}, {})'.format(period, repeat, name))
+        if name in self.__timer:
+            self.destroy_timer(self.__timer[name])
+        self.__timer_repeatable[name] = repeat
+        self.__timer[name] = self.create_timer(period, lambda: self.__timer_elapsed(name))
         response.ok = True
         return response
 
     def on_stop_call(self, request, response):
         # Timer.stop implementation
-        self.get_logger().info('Timer.stop()')
-        if self.__timer is not None:
-            self.__timer_repetable = False
-            self.destroy_timer(self.__timer)
-            self.__timer = None
+        self.get_logger().info('Timer.stop({})'.format(name))
+        self.__destroy_timer(name)
         response.ok = True
         return response
 
+    def __destroy_timer(self, name):
+        if name in self.__timer:
+            del self.__timer_repetable[name]
+            self.destroy_timer(self.__timer[name])
+            del self.__timer[name]
+    
 def main(args=None):
     rclpy.init(args=args)
     node = ROSTimer()
