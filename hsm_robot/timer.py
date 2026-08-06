@@ -78,7 +78,7 @@ class ROSTimer(rclpy.node.Node):
         msg.code = hsm_interfaces.msg.StringArgMessage.MSG_TIMER_ELAPSED
         msg.arg = name
         self.__str_msg_publisher.publish(msg)
-        if not self.__timer_repeatable[name]:
+        if not self.__timers_repeatable[name]:
             self.__destroy_timer(name)
 
     def on_init_ticks_call(self, request, response):
@@ -98,25 +98,26 @@ class ROSTimer(rclpy.node.Node):
         repeat = request.repeat
         name = request.name
         self.get_logger().info('Timer.start({}, {}, {})'.format(period, repeat, name))
-        if name in self.__timer:
-            self.destroy_timer(self.__timer[name])
-        self.__timer_repeatable[name] = repeat
-        self.__timer[name] = self.create_timer(period, lambda: self.__timer_elapsed(name))
+        if name in self.__timers:
+            self.destroy_timer(self.__timers[name])
+        self.__timers_repeatable[name] = repeat
+        self.__timers[name] = self.create_timer(period, lambda: self.__timer_elapsed(name))
         response.ok = True
         return response
 
     def on_stop_call(self, request, response):
         # Timer.stop implementation
+        name = request.name
         self.get_logger().info('Timer.stop({})'.format(name))
         self.__destroy_timer(name)
         response.ok = True
         return response
 
     def __destroy_timer(self, name):
-        if name in self.__timer:
-            del self.__timer_repetable[name]
-            self.destroy_timer(self.__timer[name])
-            del self.__timer[name]
+        if name in self.__timers:
+            del self.__timers_repetable[name]
+            self.destroy_timer(self.__timers[name])
+            del self.__timers[name]
     
 def main(args=None):
     rclpy.init(args=args)
