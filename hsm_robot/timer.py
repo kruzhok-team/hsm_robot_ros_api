@@ -10,7 +10,7 @@
 # modify it under the terms of the GNU Lesser General Public
 # License as published by the Free Software Foundation; either
 # version 3 of the License, or (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
@@ -20,8 +20,6 @@
 # along with this program. If not, see https://www.gnu.org/licenses/
 #
 # -----------------------------------------------------------------------------
-
-from functools import partial
 
 import rclpy
 import rclpy.node
@@ -56,6 +54,7 @@ class ROSTimer(rclpy.node.Node):
                                                   self.on_stop_call)
         self.__timers = {}
         self.__timers_repeatable = {}
+        self.__tick_timer = self.__second_timer = self.__minute_timer = None
         self.get_logger().info('ROSTimer service node initialized')
 
     def __tick_timer_callback(self):
@@ -69,12 +68,12 @@ class ROSTimer(rclpy.node.Node):
         self.__msg_publisher.publish(msg)
 
     def __minute_timer_callback(self):
-        msg = hsm_interfaces.msg.SimpleMessage()        
+        msg = hsm_interfaces.msg.SimpleMessage()
         msg.code = hsm_interfaces.msg.SimpleMessage.MSG_TIMER_TICK_1M
         self.__msg_publisher.publish(msg)
 
     def __timer_elapsed(self, name):
-        msg = hsm_interfaces.msg.StringArgMessage()        
+        msg = hsm_interfaces.msg.StringArgMessage()
         msg.code = hsm_interfaces.msg.StringArgMessage.MSG_TIMER_ELAPSED
         msg.arg = name
         self.__str_msg_publisher.publish(msg)
@@ -115,10 +114,10 @@ class ROSTimer(rclpy.node.Node):
 
     def __destroy_timer(self, name):
         if name in self.__timers:
-            del self.__timers_repetable[name]
+            del self.__timers_repeatable[name]
             self.destroy_timer(self.__timers[name])
             del self.__timers[name]
-    
+
 def main(args=None):
     rclpy.init(args=args)
     node = ROSTimer()

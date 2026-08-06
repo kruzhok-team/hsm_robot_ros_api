@@ -10,7 +10,7 @@
 # modify it under the terms of the GNU Lesser General Public
 # License as published by the Free Software Foundation; either
 # version 3 of the License, or (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
@@ -21,6 +21,7 @@
 #
 # -----------------------------------------------------------------------------
 
+import math
 import rclpy
 import rclpy.node
 
@@ -70,7 +71,7 @@ class ROSNavigation(rclpy.node.Node):
         self.__stopped = False
 
     def __path_found(self):
-        msg = hsm_interfaces.msg.SimpleMessage()        
+        msg = hsm_interfaces.msg.SimpleMessage()
         msg.code = hsm_interfaces.msg.SimpleMessage.MSG_NAVIGATION_PATH_FOUND
         self.__msg_publisher.publish(msg)
 
@@ -83,18 +84,14 @@ class ROSNavigation(rclpy.node.Node):
         wy = msg.twist.twist.angular.y
         wz = msg.twist.twist.angular.z
         # self.get_logger().info(f"vx={vx:.2f} vy={vy:.2f} vth={vth:.2f} wx={wx:.2f} wy={wy:.2f} wz={wz:.2f}")
-        if abs(vx) < self.LINEAR_SPEED_THRESHOLD and \
-            abs(vy) < self.LINEAR_SPEED_THRESHOLD and \
-            abs(vth) < self.LINEAR_SPEED_THRESHOLD and \
-            abs(wx) < self.ANGULAR_SPEED_THRESHOLD and \
-            abs(wy) < self.ANGULAR_SPEED_THRESHOLD and \
-            abs(wz) < self.ANGULAR_SPEED_THRESHOLD:
-
+        v = math.sqrt(vx ** vx + vy ** vy + vth ** vth)
+        w = math.sqrt(wx ** wx + wy ** wy + wz ** wz)
+        if abs(v) < self.LINEAR_SPEED_THRESHOLD and abs(w) < self.ANGULAR_SPEED_THRESHOLD:
             if not self.__stopped:
                 msg = hsm_interfaces.msg.SimpleMessage()
                 msg.code = hsm_interfaces.msg.SimpleMessage.MSG_NAVIGATION_STOP_COMPLETED
                 self.__msg_publisher.publish(msg)
-                self.get_logger().info('ROSNavigation MSG_NAVIGATION_STOP_COMPLETED')                
+                self.get_logger().info('ROSNavigation MSG_NAVIGATION_STOP_COMPLETED')
                 self.__stopped = True
         else:
             self.__stopped = False
@@ -113,7 +110,7 @@ class ROSNavigation(rclpy.node.Node):
             self.get_logger().info('ROSNavigation MSG_NAVIGATION_RIGHT_OPEN_SPACE')
 
         if center_dist < self.OBSTACLE_RANGE / 3:
-            msg = hsm_interfaces.msg.SimpleMessage()        
+            msg = hsm_interfaces.msg.SimpleMessage()
             msg.code = hsm_interfaces.msg.SimpleMessage.MSG_NAVIGATION_COLLISION_DETECTED
             self.__msg_publisher.publish(msg)
             self.get_logger().info('ROSNavigation MSG_NAVIGATION_COLLISION_DETECTED')
@@ -127,7 +124,7 @@ class ROSNavigation(rclpy.node.Node):
         # Navigation.move_to_point implementation
         pose = request.pose
         self.get_logger().info('Navigation.move_to_point({})'.format(pose))
-        self.__goal_publisher.publish(pose)      
+        self.__goal_publisher.publish(pose)
         response.ok = True
         return response
 

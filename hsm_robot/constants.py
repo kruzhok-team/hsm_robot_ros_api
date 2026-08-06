@@ -10,7 +10,7 @@
 # modify it under the terms of the GNU Lesser General Public
 # License as published by the Free Software Foundation; either
 # version 3 of the License, or (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
@@ -24,7 +24,7 @@
 MESSAGES_TOPIC = '/hsm_ros_msg' # the ROS2 topic for HSM messages
 STR_MESSAGES_TOPIC = '/hsm_ros_str_msg' # the ROS2 topic for HSM messages with
                                         # the single string argument
-ODOMETRY_TOPIC = '/odom'        # the ROS2 odometry topic 
+ODOMETRY_TOPIC = '/odom'        # the ROS2 odometry topic
 LASER_TOPIC = '/scan'           # the ROS2 laser scan topic
 FRAME_ID = 'hsm_ros_api'        # the ROS2 frame for HSM messages
 MSG_QUEUE_LEN = 10              # the ROS2 messages queue length

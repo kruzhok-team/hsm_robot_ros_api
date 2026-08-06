@@ -9,7 +9,7 @@
 # modify it under the terms of the GNU Lesser General Public
 # License as published by the Free Software Foundation; either
 # version 3 of the License, or (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
@@ -29,7 +29,7 @@ class ROSDebug(rclpy.node.Node):
 
     OBJECT_NAME = 'hsm_ros_debug'
     PRINT_SERVICE = 'hsm_ros_debug_print'
-    
+
     def __init__(self):
         rclpy.node.Node.__init__(self, self.OBJECT_NAME)
         self.__service_print = self.create_service(hsm_interfaces.srv.DebugPrint,
@@ -39,7 +39,7 @@ class ROSDebug(rclpy.node.Node):
 
     def on_print_call(self, request, response):
         # Debug.print implementation
-        self.get_logger().info('Debug.print: {}'.format(request.s))        
+        self.get_logger().info('Debug.print: {}'.format(request.s))
         response.ok = True
         return response
 
