@@ -85,8 +85,10 @@ class ROSNavigation(rclpy.node.Node):
         wz = msg.twist.twist.angular.z
         # self.get_logger().info(f"vx={vx:.2f} vy={vy:.2f} vth={vth:.2f} wx={wx:.2f} wy={wy:.2f} wz={wz:.2f}")
         v = math.sqrt(vx ** vx + vy ** vy + vth ** vth)
-        w = math.sqrt(wx ** wx + wy ** wy + wz ** wz)
-        if abs(v) < self.LINEAR_SPEED_THRESHOLD and abs(w) < self.ANGULAR_SPEED_THRESHOLD:
+        if (abs(v) < self.LINEAR_SPEED_THRESHOLD and
+            abs(wx) < self.ANGULAR_SPEED_THRESHOLD and
+            abs(wy) < self.ANGULAR_SPEED_THRESHOLD and
+            abs(wz) < self.ANGULAR_SPEED_THRESHOLD):
             if not self.__stopped:
                 msg = hsm_interfaces.msg.SimpleMessage()
                 msg.code = hsm_interfaces.msg.SimpleMessage.MSG_NAVIGATION_STOP_COMPLETED
