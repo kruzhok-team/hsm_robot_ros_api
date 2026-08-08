@@ -15,7 +15,7 @@ Here is the architectural scheme of the API implementation:
      hsm_controller.py                   navigation_caller.py                          navigation.py
     +----------------+                  +-------------------+                       +-----------------+
     |                | --- methods ---> |    Navigation     | --- service call ---> | Navigation Node |
-    |                | <-- events ----- | (the caller node) | <-- service result -- |  (ROS2 impl.)   |
+    |                | <-- events ----- | (the caller node) | <-- events ---------- |  (ROS2 impl.)   |
     |                |                  +-------------------+                       +-----------------+
     | HSM Controller |
     |      Node      |                    wheels_caller.py
@@ -31,6 +31,24 @@ For instance, the code incorporated into the HSM diagram calls a method from the
 `Navigation` object. This call is proxied through the ROS2 service call to the dedicated
 navigation node running in the system. A syncronous result or an event are proxied back.
 
+## The HSM-ROS Messages and Topics
+
+The Module Nodes send messages to the controller according to the HSM diagram. There are
+three types of messages:
+
+* `hsm_controller/msg/SimpleMessage.msg` - messages without arguments;
+* `hsm_controller/msg/StringArgMessage.msg` - messages with the single string argument
+  (e.g. `TIMER_ELAPSED`);
+* `hsm_controller/msg/NumberArgMessage.msg` - messages with the single numeric argument. 
+
+The `code` parameter holds the unique message id.
+
+The event messages are transfered through the following topics:
+
+* `/hsm_ros_msg` - the ROS2 topic for HSM simple messages;
+* `/hsm_ros_str_msg` - the ROS2 topic for HSM string messages.
+* `/hsm_ros_num_msg` - the ROS2 topic for HSM number messages.
+
 ## The Code Structure
 	
 The API implementation code is distributed onto three packages:
@@ -44,24 +62,6 @@ The API implementation code is distributed onto three packages:
   with the API callers (`hsm_controller.py` is generated, it inherits
   `base_hsm_controller.py` and the callers from `navigation_caller.py`,
   `wheels_caller.py`, and so on).
-
-## The HSM-ROS Messages and Topics
-
-The Module Nodes send messages to the controller according to the HSM diagram. There are
-three types of messages:
-
-* `hsm_controller/msg/SimpleMessage.msg` - messages without arguments;
-* `hsm_controller/msg/StringArgMessage.msg` - messages with the single string argument
-  (e.g. `TIMER_ELAPSED`);
-* `hsm_controller/msg/NumberArgMessage.msg` - messages with the single numeric argument. 
-
-The `code` parameter holds the unique message id.
-
-The messages are transfered through the following topics:
-
-* `/hsm_ros_msg` - the ROS2 topic for HSM simple messages;
-* `/hsm_ros_str_msg` - the ROS2 topic for HSM string messages.
-* `/hsm_ros_num_msg` - the ROS2 topic for HSM number messages.
 
 ## The ROS2 Incapsulation
 

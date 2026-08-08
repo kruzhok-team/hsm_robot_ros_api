@@ -10,6 +10,7 @@ The methods available:
 * `move_to_point(x, y, theta=None)` – move to point with the coordinates `(x, y)` and the
 targe angle `theta` radians;
 * `stop()` – stop movement;
+* `get_point()` – return the pair `(x, y, theta)` of the robot's current position.
 
 The events available:
 
@@ -39,6 +40,20 @@ The events available:
 
 * `STOP_COMPLETED` – the stopping process was completed;
 
+## Pump Module
+
+Pump module is the pump control interface. It turns on/off the pump motor available at
+unmanned ships.
+
+The methods available:
+
+* `turn_on()` – turn on the pump;
+* `turn_off()` – turn off the pump.
+
+The events available:
+
+* `STOP_COMPLETED` – the stopping process was completed;
+
 ## Timer Module
 
 `Timer` module is the timers control interface. It allows setting timers and use regular time events.
@@ -55,7 +70,8 @@ The events available:
   system, e.g. 0.2 sec);
 * `TIMER_TICK_1S` – once-a-second counter timer;
 * `TIMER_TICK_1M` – once-a-minute counter timer;
-* `TIMER_ELAPSED(name)` – the previously set times was completed.
+* `TIMER_ELAPSED(name)` – the previously set timer was completed. The timer's name is
+  stored in the `name` variable.
 
 ## Debug Module
 
@@ -66,6 +82,23 @@ The methods available:
 
 * `print(s)` – print the string `s` to a debug log;
 * `println(s)` – print the string `s` followed by a new line characters to a debug log.
+
+The events available:
+
+None.
+
+## Storage Module
+
+`Storage` module interface provides saving data to a long-term storage. It stores data on
+the local disk.
+
+The methods available:
+
+* `new(name, array)` – create the numeric `array` at the local storage named `name`;
+* `add(name, point)` – save the `point` to the storage `name`;
+* `load(name)` – load the set of numeric arrays named `name` from file to memory;
+* `next(name)` – get the next point from the storage `name`;
+* `has_data(name)` – the next point availability flag for the storage `name`.
 
 The events available:
 
