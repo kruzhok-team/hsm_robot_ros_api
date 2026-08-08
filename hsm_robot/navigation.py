@@ -84,7 +84,7 @@ class ROSNavigation(rclpy.node.Node):
         wy = msg.twist.twist.angular.y
         wz = msg.twist.twist.angular.z
         # self.get_logger().info(f"vx={vx:.2f} vy={vy:.2f} vth={vth:.2f} wx={wx:.2f} wy={wy:.2f} wz={wz:.2f}")
-        v = math.sqrt(vx ** vx + vy ** vy + vth ** vth)
+        v = math.sqrt(vx ** 2 + vy ** 2 + vth ** 2)
         if (abs(v) < self.LINEAR_SPEED_THRESHOLD and
             abs(wx) < self.ANGULAR_SPEED_THRESHOLD and
             abs(wy) < self.ANGULAR_SPEED_THRESHOLD and
