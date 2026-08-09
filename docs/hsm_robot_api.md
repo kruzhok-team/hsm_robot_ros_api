@@ -14,14 +14,25 @@ targe angle `theta` radians;
 
 The events available:
 
-* `PATH_FOUND` – the path to the target point was built; 
-* `PATH_NOT_FOUND` – the path to the target point cannot be built;
-* `MOVE_COMPLETED` – the movement was completed;
-* `STOP_COMPLETED` – the stopping process was completed;
+* `PATH_FOUND` – the path to the target point was built (declared, but not raised by the
+current implementation);
+* `PATH_NOT_FOUND` – the path to the target point cannot be built (declared, but not
+raised by the current implementation);
+* `MOVE_COMPLETED` – the movement was completed, i.e. the robot came closer to the target
+point than the goal tolerance;
 * `COLLISION_WARNING` – the possible collision detecion warning;
 * `COLLISION_DETECTED` – the collision detection;
 * `RIGHT_OPEN_SPACE` – there is free space to the right of the robot (the disance if
 fixed now - 0.5 m).
+
+The `Navigation` module moves the robot with the wheels, therefore using `Navigation`
+implies using the `Wheels` module: the `Wheels` events (`STOP_COMPLETED`) are available in
+the diagram which declares `Navigation` only, and the wheels module node has to be started
+along with the navigation one.
+
+The `get_point()` method returns the robot position immediately without a service call: the
+module reads the robot odometry to keep the current position. The method returns nothing
+(`None`) until the first odometry message is received.
 
 ## Wheels Module
 
@@ -38,7 +49,8 @@ The methods available:
 
 The events available:
 
-* `STOP_COMPLETED` – the stopping process was completed;
+* `STOP_COMPLETED` – the stopping process was completed. The event is raised by the
+`Wheels` module: it reports the state of the wheels, not of the navigation process.
 
 ## Pump Module
 
@@ -52,7 +64,7 @@ The methods available:
 
 The events available:
 
-* `STOP_COMPLETED` – the stopping process was completed;
+None.
 
 ## Timer Module
 
@@ -99,6 +111,15 @@ The methods available:
 * `load(name)` – load the set of numeric arrays named `name` from file to memory;
 * `next(name)` – get the next point from the storage `name`;
 * `has_data(name)` – the next point availability flag for the storage `name`.
+
+A point is the array of numbers, e.g. the pair of coordinates; the single number is
+accepted as well and is stored as the array of one element. The `next(name)` method
+returns the point as the array of numbers and returns nothing (`None`) when the storage is
+exhausted, so `has_data(name)` should be checked first.
+
+The `load(name)` method reads the storage into the diagram memory, therefore `next()` and
+`has_data()` answer immediately. The points saved by `new()` and `add()` are available for
+reading without the `load()` call.
 
 The events available:
 

@@ -43,17 +43,15 @@ class ROSNavigation(rclpy.node.Node):
     STOP_MESSAGE_FRAME_ID = '__CANCEL_NAV__'
     OBSTACLE_RANGE = 0.45
     OPEN_SPACE_RANGE = 0.5
-    LINEAR_SPEED_THRESHOLD = 0.001
-    ANGULAR_SPEED_THRESHOLD = 0.001
     SCAN_WINDOW = 0.0873  # +/- 5 degrees around the inspected scan direction
 
     def __init__(self):
         rclpy.node.Node.__init__(self, self.OBJECT_NAME)
-        # the stop latch has to be ready before the odometry subscription is created,
-        # otherwise an early /odom message reaches the callback before the attribute
-        # exists; True means "no motion seen yet", so no STOP_COMPLETED is emitted
-        # until the robot has actually moved
-        self.__stopped = True
+        # the goal has to be ready before the odometry subscription is created, otherwise
+        # an early /odom message reaches the callback before the attribute exists;
+        # None means "no target requested", so MOVE_COMPLETED is emitted only after an
+        # actual move_to_point call
+        self.__goal = None
         self.__msg_publisher = self.create_publisher(hsm_interfaces.msg.SimpleMessage,
                                                      hsm_robot.constants.MESSAGES_TOPIC,
                                                      hsm_robot.constants.MSG_QUEUE_LEN)
@@ -82,27 +80,23 @@ class ROSNavigation(rclpy.node.Node):
         self.__msg_publisher.publish(msg)
 
     def odom_callback(self, msg):
-        # process odometry
-        vx = msg.twist.twist.linear.x
-        vy = msg.twist.twist.linear.y
-        vth = msg.twist.twist.linear.z
-        wx = msg.twist.twist.angular.x
-        wy = msg.twist.twist.angular.y
-        wz = msg.twist.twist.angular.z
-        # self.get_logger().info(f"vx={vx:.2f} vy={vy:.2f} vth={vth:.2f} wx={wx:.2f} wy={wy:.2f} wz={wz:.2f}")
-        v = math.sqrt(vx ** 2 + vy ** 2 + vth ** 2)
-        if (abs(v) < self.LINEAR_SPEED_THRESHOLD and
-            abs(wx) < self.ANGULAR_SPEED_THRESHOLD and
-            abs(wy) < self.ANGULAR_SPEED_THRESHOLD and
-            abs(wz) < self.ANGULAR_SPEED_THRESHOLD):
-            if not self.__stopped:
-                msg = hsm_interfaces.msg.SimpleMessage()
-                msg.code = hsm_interfaces.msg.SimpleMessage.MSG_NAVIGATION_STOP_COMPLETED
-                self.__msg_publisher.publish(msg)
-                self.get_logger().info('ROSNavigation MSG_NAVIGATION_STOP_COMPLETED')
-                self.__stopped = True
-        else:
-            self.__stopped = False
+        # process odometry: the target point is reached when the robot comes closer to it
+        # than GOAL_TOLERANCE. The wheels module reports STOP_COMPLETED on its own, so
+        # only the movement goal is tracked here
+        if self.__goal is None:
+            return
+        goal_x, goal_y = self.__goal
+        dx = goal_x - msg.pose.pose.position.x
+        dy = goal_y - msg.pose.pose.position.y
+        if math.sqrt(dx ** 2 + dy ** 2) > hsm_robot.constants.GOAL_TOLERANCE:
+            return
+        # the goal is dropped before the event is published, so the arrival is reported
+        # once per move_to_point call and not on every odometry message that follows
+        self.__goal = None
+        event = hsm_interfaces.msg.SimpleMessage()
+        event.code = hsm_interfaces.msg.SimpleMessage.MSG_NAVIGATION_MOVE_COMPLETED
+        self.__msg_publisher.publish(event)
+        self.get_logger().info('ROSNavigation MSG_NAVIGATION_MOVE_COMPLETED')
 
     def __beam_min(self, msg, angle):
         # the smallest valid range within +/- SCAN_WINDOW around the requested angle;
@@ -163,6 +157,7 @@ class ROSNavigation(rclpy.node.Node):
         # Navigation.move_to_point implementation
         pose = request.pose
         self.get_logger().info('Navigation.move_to_point({})'.format(pose))
+        self.__goal = (pose.pose.position.x, pose.pose.position.y)
         self.__goal_publisher.publish(pose)
         response.ok = True
         return response
@@ -170,6 +165,9 @@ class ROSNavigation(rclpy.node.Node):
     def on_stop_call(self, request, response):
         # Navigation.stop implementation
         self.get_logger().info('Navigation.stop()')
+        # a cancelled movement must not report MOVE_COMPLETED later, even if the robot
+        # coasts into the abandoned target point
+        self.__goal = None
         empty_pose = PoseStamped()
         empty_pose.header.frame_id = self.STOP_MESSAGE_FRAME_ID
         self.__goal_publisher.publish(empty_pose)
