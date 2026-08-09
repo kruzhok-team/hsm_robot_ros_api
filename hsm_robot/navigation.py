@@ -16,7 +16,7 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 # Lesser General Public License for more details.
 #
-# You should have received a copy of the GNU General Public License
+# You should have received a copy of the GNU Lesser General Public License
 # along with this program. If not, see https://www.gnu.org/licenses/
 #
 # -----------------------------------------------------------------------------
@@ -24,6 +24,7 @@
 import math
 import rclpy
 import rclpy.node
+from rclpy.executors import ExternalShutdownException
 
 from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import Odometry
@@ -44,9 +45,15 @@ class ROSNavigation(rclpy.node.Node):
     OPEN_SPACE_RANGE = 0.5
     LINEAR_SPEED_THRESHOLD = 0.001
     ANGULAR_SPEED_THRESHOLD = 0.001
+    SCAN_WINDOW = 0.0873  # +/- 5 degrees around the inspected scan direction
 
     def __init__(self):
         rclpy.node.Node.__init__(self, self.OBJECT_NAME)
+        # the stop latch has to be ready before the odometry subscription is created,
+        # otherwise an early /odom message reaches the callback before the attribute
+        # exists; True means "no motion seen yet", so no STOP_COMPLETED is emitted
+        # until the robot has actually moved
+        self.__stopped = True
         self.__msg_publisher = self.create_publisher(hsm_interfaces.msg.SimpleMessage,
                                                      hsm_robot.constants.MESSAGES_TOPIC,
                                                      hsm_robot.constants.MSG_QUEUE_LEN)
@@ -68,7 +75,6 @@ class ROSNavigation(rclpy.node.Node):
                                                           self.scan_callback,
                                                           hsm_robot.constants.MSG_QUEUE_LEN)
         self.get_logger().info('ROSNavigation service node initialized')
-        self.__stopped = False
 
     def __path_found(self):
         msg = hsm_interfaces.msg.SimpleMessage()
@@ -98,28 +104,59 @@ class ROSNavigation(rclpy.node.Node):
         else:
             self.__stopped = False
 
+    def __beam_min(self, msg, angle):
+        # the smallest valid range within +/- SCAN_WINDOW around the requested angle;
+        # the indices are derived from the scan header instead of being hardcoded, so
+        # the result does not depend on the scanner orientation
+        # returns None when the sector carries no valid measurement
+        if msg.angle_increment == 0.0:
+            return None
+        check_limits = msg.range_max > msg.range_min
+        half = max(1, int(self.SCAN_WINDOW / abs(msg.angle_increment)))
+        center = int(round((angle - msg.angle_min) / msg.angle_increment))
+        result = None
+        for i in range(center - half, center + half + 1):
+            if i < 0 or i >= len(msg.ranges):
+                continue
+            distance = msg.ranges[i]
+            # inf marks "no return" and nan marks an invalid beam: both must be dropped,
+            # otherwise inf compares greater than every threshold and nan silently
+            # makes each comparison false
+            if not math.isfinite(distance):
+                continue
+            if check_limits and (distance < msg.range_min or distance > msg.range_max):
+                continue
+            if result is None or distance < result:
+                result = distance
+        return result
+
     def scan_callback(self, msg):
         # process laser scan
-        size = len(msg.ranges)
-        center_dist = msg.ranges[size // 2]
-        right_dist = msg.ranges[0]
-        self.get_logger().info(f"cent={center_dist:.2f} right={right_dist:.2f}")
+        if not msg.ranges:
+            return
+        center_dist = self.__beam_min(msg, 0.0)
+        right_dist = self.__beam_min(msg, -math.pi / 2.0)
+        self.get_logger().info('cent={} right={}'.format(center_dist, right_dist),
+                               throttle_duration_sec=1.0)
 
-        if right_dist > self.OPEN_SPACE_RANGE:
-            msg = hsm_interfaces.msg.SimpleMessage()
-            msg.code = hsm_interfaces.msg.SimpleMessage.MSG_NAVIGATION_RIGHT_OPEN_SPACE
-            self.__msg_publisher.publish(msg)
+        if right_dist is not None and right_dist > self.OPEN_SPACE_RANGE:
+            event = hsm_interfaces.msg.SimpleMessage()
+            event.code = hsm_interfaces.msg.SimpleMessage.MSG_NAVIGATION_RIGHT_OPEN_SPACE
+            self.__msg_publisher.publish(event)
             self.get_logger().info('ROSNavigation MSG_NAVIGATION_RIGHT_OPEN_SPACE')
 
+        if center_dist is None:
+            return
+
         if center_dist < self.OBSTACLE_RANGE / 3:
-            msg = hsm_interfaces.msg.SimpleMessage()
-            msg.code = hsm_interfaces.msg.SimpleMessage.MSG_NAVIGATION_COLLISION_DETECTED
-            self.__msg_publisher.publish(msg)
+            event = hsm_interfaces.msg.SimpleMessage()
+            event.code = hsm_interfaces.msg.SimpleMessage.MSG_NAVIGATION_COLLISION_DETECTED
+            self.__msg_publisher.publish(event)
             self.get_logger().info('ROSNavigation MSG_NAVIGATION_COLLISION_DETECTED')
         elif center_dist < self.OBSTACLE_RANGE:
-            msg = hsm_interfaces.msg.SimpleMessage()
-            msg.code = hsm_interfaces.msg.SimpleMessage.MSG_NAVIGATION_COLLISION_WARNING
-            self.__msg_publisher.publish(msg)
+            event = hsm_interfaces.msg.SimpleMessage()
+            event.code = hsm_interfaces.msg.SimpleMessage.MSG_NAVIGATION_COLLISION_WARNING
+            self.__msg_publisher.publish(event)
             self.get_logger().info('ROSNavigation MSG_NAVIGATION_COLLISION_WARNING')
 
     def on_move_to_point_call(self, request, response):
@@ -142,8 +179,13 @@ class ROSNavigation(rclpy.node.Node):
 def main(args=None):
     rclpy.init(args=args)
     node = ROSNavigation()
-    rclpy.spin(node)
-    rclpy.shutdown()
+    try:
+        rclpy.spin(node)
+    except (KeyboardInterrupt, ExternalShutdownException):
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.try_shutdown()
 
 if __name__ == "__main__":
     main()

@@ -17,7 +17,7 @@ setup(
     maintainer='Alexey Fedoseev',
     maintainer_email='aleksey@fedoseev.net',
     description='HSM Robot API',
-    license='LGPL v3',
+    license='LGPL-3.0-or-later',
     extras_require={
         'test': [
             'pytest',

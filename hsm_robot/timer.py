@@ -16,13 +16,14 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 # Lesser General Public License for more details.
 #
-# You should have received a copy of the GNU General Public License
+# You should have received a copy of the GNU Lesser General Public License
 # along with this program. If not, see https://www.gnu.org/licenses/
 #
 # -----------------------------------------------------------------------------
 
 import rclpy
 import rclpy.node
+from rclpy.executors import ExternalShutdownException
 
 import hsm_robot.constants
 import hsm_interfaces.msg
@@ -73,15 +74,30 @@ class ROSTimer(rclpy.node.Node):
         self.__msg_publisher.publish(msg)
 
     def __timer_elapsed(self, name):
+        # a callback already queued by the executor may fire after Timer.stop() has
+        # destroyed the timer, so the name is no longer guaranteed to be known here
+        if name not in self.__timers:
+            return
         msg = hsm_interfaces.msg.StringArgMessage()
         msg.code = hsm_interfaces.msg.StringArgMessage.MSG_TIMER_ELAPSED
         msg.arg = name
         self.__str_msg_publisher.publish(msg)
-        if not self.__timers_repeatable[name]:
+        if not self.__timers_repeatable.get(name, False):
             self.__destroy_timer(name)
 
     def on_init_ticks_call(self, request, response):
         # Start standard timers
+        # the call is idempotent: the previous tick timers are dropped first, otherwise
+        # a second call would leave the old ones running and duplicate the tick stream
+        if self.__tick_timer is not None:
+            self.destroy_timer(self.__tick_timer)
+            self.__tick_timer = None
+        if self.__second_timer is not None:
+            self.destroy_timer(self.__second_timer)
+            self.__second_timer = None
+        if self.__minute_timer is not None:
+            self.destroy_timer(self.__minute_timer)
+            self.__minute_timer = None
         if request.run_ticks:
             self.__tick_timer = self.create_timer(hsm_robot.constants.TICK_LEN, self.__tick_timer_callback)
         if request.run_ticks_1sec:
@@ -121,8 +137,13 @@ class ROSTimer(rclpy.node.Node):
 def main(args=None):
     rclpy.init(args=args)
     node = ROSTimer()
-    rclpy.spin(node)
-    rclpy.shutdown()
+    try:
+        rclpy.spin(node)
+    except (KeyboardInterrupt, ExternalShutdownException):
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.try_shutdown()
 
 if __name__ == "__main__":
     main()
