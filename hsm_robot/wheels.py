@@ -1,8 +1,9 @@
 # -----------------------------------------------------------------------------
 # The Cyberiada HSM-to-ROS2 library
 #
-# The ROS2 navigation module implementation
+# The ROS2 wheels module implementation
 #
+# Copyright (C) 2026 Alexey Fedoseev <aleksey@fedoseev.net>
 # Copyright (C) 2026 Anastasia Viktorova <viktorovaa.04@gmail.com>
 #
 # This program is free software; you can redistribute it and/or
@@ -20,6 +21,7 @@
 #
 # -----------------------------------------------------------------------------
 
+import math
 import rclpy
 import rclpy.node
 from rclpy.executors import ExternalShutdownException
@@ -29,6 +31,7 @@ import hsm_interfaces.msg
 import hsm_interfaces.srv
 
 from geometry_msgs.msg import Twist
+from nav_msgs.msg import Odometry
 
 class ROSWheels(rclpy.node.Node):
 
@@ -39,9 +42,16 @@ class ROSWheels(rclpy.node.Node):
     TURN_RIGHT_SERVICE = 'hsm_ros_wheels_turn_right'
     TURN_LEFT_SERVICE = 'hsm_ros_wheels_turn_left'
     VELOCITY_TOPIC = '/cmd_vel'
+    LINEAR_SPEED_THRESHOLD = 0.001
+    ANGULAR_SPEED_THRESHOLD = 0.001
 
     def __init__(self):
         rclpy.node.Node.__init__(self, self.OBJECT_NAME)
+        # the stop latch has to be ready before the odometry subscription is created,
+        # otherwise an early /odom message reaches the callback before the attribute
+        # exists; True means "no motion seen yet", so no STOP_COMPLETED is emitted
+        # until the robot has actually moved
+        self.__stopped = True
         self.__service_stop = self.create_service(hsm_interfaces.srv.WheelsStop,
                                                   self.STOP_SERVICE,
                                                   self.on_stop_call)
@@ -60,8 +70,38 @@ class ROSWheels(rclpy.node.Node):
         self.__twist_publisher = self.create_publisher(Twist,
                                                        self.VELOCITY_TOPIC,
                                                        hsm_robot.constants.MSG_QUEUE_LEN)
+        self.__msg_publisher = self.create_publisher(hsm_interfaces.msg.SimpleMessage,
+                                                     hsm_robot.constants.MESSAGES_TOPIC,
+                                                     hsm_robot.constants.MSG_QUEUE_LEN)
+        self.__odom_subscriber = self.create_subscription(Odometry,
+                                                          hsm_robot.constants.ODOMETRY_TOPIC,
+                                                          self.odom_callback,
+                                                          hsm_robot.constants.MSG_QUEUE_LEN)
 
         self.get_logger().info('ROSWheels service node initialized')
+
+    def odom_callback(self, msg):
+        # process odometry: the wheels module owns STOP_COMPLETED because the event
+        # reports the state of the wheels, not of the navigation process
+        vx = msg.twist.twist.linear.x
+        vy = msg.twist.twist.linear.y
+        vz = msg.twist.twist.linear.z
+        wx = msg.twist.twist.angular.x
+        wy = msg.twist.twist.angular.y
+        wz = msg.twist.twist.angular.z
+        v = math.sqrt(vx ** 2 + vy ** 2 + vz ** 2)
+        if (abs(v) < self.LINEAR_SPEED_THRESHOLD and
+            abs(wx) < self.ANGULAR_SPEED_THRESHOLD and
+            abs(wy) < self.ANGULAR_SPEED_THRESHOLD and
+            abs(wz) < self.ANGULAR_SPEED_THRESHOLD):
+            if not self.__stopped:
+                event = hsm_interfaces.msg.SimpleMessage()
+                event.code = hsm_interfaces.msg.SimpleMessage.MSG_WHEELS_STOP_COMPLETED
+                self.__msg_publisher.publish(event)
+                self.get_logger().info('ROSWheels MSG_WHEELS_STOP_COMPLETED')
+                self.__stopped = True
+        else:
+            self.__stopped = False
 
     def on_stop_call(self, request, response):
         # Wheels.stop implementation

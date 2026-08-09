@@ -16,16 +16,55 @@ Here is the architectural scheme of the API implementation:
     +----------------+                  +-------------------+                       +-----------------+
     |                | --- methods ---> |    Navigation     | --- service call ---> | Navigation Node |
     |                | <-- events ----- | (the caller node) | <-- events ---------- |  (ROS2 impl.)   |
+    |                |                  |                   | <-- /odom ----------- |    (position)   |
     |                |                  +-------------------+                       +-----------------+
-    | HSM Controller |
-    |      Node      |                    wheels_caller.py
-    |                |                  +-------------------+
-    |   (based on    | --- methods ---> |      Wheels       | --- ...
-    |  HSM diagram)  | <-- events ----- | (the caller node) | <-- ...
+    |                |
+    |                |                    wheels_caller.py                              wheels.py
+    |                |                  +-------------------+                       +-----------------+
+    | HSM Controller | --- methods ---> |      Wheels       | --- service call ---> |   Wheels Node   |
+    |      Node      | <-- events ----- | (the caller node) | <-- STOP_COMPLETED --- |  (ROS2 impl.)   |
+    |                |                  +-------------------+                       +-----------------+
+    |   (based on    |
+    |  HSM diagram)  |                    pump_caller.py                                 pump.py
+    |                |                  +-------------------+                       +-----------------+
+    |                | --- methods ---> |       Pump        | --- service call ---> |    Pump Node    |
+    |                |                  | (the caller node) |                       |  (ROS2 impl.)   |
+    |                |                  +-------------------+                       +-----------------+
+    |                |
+    |                |                    storage_caller.py                             storage.py
+    |                |                  +-------------------+                       +-----------------+
+    |                | --- methods ---> |      Storage      | --- service call ---> |  Storage Node   |
+    |                |                  | (the caller node) | <-- the stored data -- |  (local disk)   |
+    |                |                  |  (the data cache) |                       +-----------------+
     |                |                  +-------------------+
     |                |
-    |                |      ...
+    |                |                    timer_caller.py, debug_caller.py
+    |                |                  +-------------------+
+    |                | --- methods ---> |   Timer, Debug    | --- ...
+    |                | <-- events ----- | (the caller nodes)| <-- ...
+    |                |                  +-------------------+
     +----------------+
+
+Most of the API methods are proxied to the module nodes through the ROS2 service calls, but
+two of them have to answer immediately, because a blocking call inside the HSM diagram code
+would stop the controller node:
+
+* `Navigation.get_point()` reads the robot position from the odometry topic and returns the
+  cached value;
+* `Storage.next()` and `Storage.has_data()` read the data cache filled by the
+  `Storage.load()` call.
+
+## The HSM Modules Dependencies
+
+A module may imply the other modules. The dependencies are declared in the
+`HSM_MODULE_DEPENDENCIES` table of the `hsm_controller/constants.py` file and are resolved
+both by the code generator and by the controller node, so the diagram declaring a module
+gets the implied callers and their events as well.
+
+The dependencies available:
+
+* `Navigation` implies `Wheels` – the navigation module moves the robot with the wheels,
+  and the wheels module reports `STOP_COMPLETED`.
 
 For instance, the code incorporated into the HSM diagram calls a method from the
 `Navigation` object. This call is proxied through the ROS2 service call to the dedicated
@@ -70,4 +109,12 @@ package uses standard ROS2 topics and calls. Here is the list of the ROS2 object
 this implementation:
 
 * `/cmd_vel` - define the robot velocity;
-* `/odom` - receive the robot odometry.
+* `/odom` - receive the robot odometry. The topic is used by the wheels module to detect
+  the stopping of the robot, by the navigation module to detect the reaching of the target
+  point, and by the navigation caller to answer the `get_point()` calls;
+* `/scan` - receive the laser scan (the navigation module obstacle detection);
+* `/goal_pose` - define the navigation target point;
+* `/pump` - turn the pump on and off.
+
+The long-term storage of the `Storage` module is kept on the local disk in the
+`~/.hsm_robot/storage` directory, a single JSON file per storage.

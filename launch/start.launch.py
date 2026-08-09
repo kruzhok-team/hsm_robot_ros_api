@@ -24,7 +24,18 @@ def generate_launch_description():
         executable='navigation_node',
         name='navigation_node'
     )
+    pump_node = Node(
+        package='hsm_robot',
+        executable='pump_node',
+        name='pump_node'
+    )
+    storage_node = Node(
+        package='hsm_robot',
+        executable='storage_node',
+        name='storage_node'
+    )
 
     return LaunchDescription([
-        debug_node, timer_node, wheels_node, navigation_node
+        debug_node, timer_node, wheels_node, navigation_node,
+        pump_node, storage_node
     ])
