@@ -17,6 +17,10 @@ The documentation is located in the `docs` directory and contains:
 * The HSM Robot architecture - `hsm_robot_architecture.md`
 * The API specificaion - `hsm_robot_api.md`
 
+The testing of the API is described in the "Testing" section of
+`hsm_robot_architecture.md`. The testing architecture of the whole framework is described
+in the testing project - https://github.com/kruzhok-team/hsm_robot_ros_tests
+
 ## Requirements
 
 * ROS 2 Jazzy

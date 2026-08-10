@@ -78,7 +78,8 @@ three types of messages:
 * `hsm_controller/msg/SimpleMessage.msg` - messages without arguments;
 * `hsm_controller/msg/StringArgMessage.msg` - messages with the single string argument
   (e.g. `TIMER_ELAPSED`);
-* `hsm_controller/msg/NumberArgMessage.msg` - messages with the single numeric argument. 
+* `hsm_controller/msg/NumberArgMessage.msg` - messages with the single numeric argument.
+  The message is declared by the interfaces package, but no module uses it yet.
 
 The `code` parameter holds the unique message id.
 
@@ -86,7 +87,9 @@ The event messages are transfered through the following topics:
 
 * `/hsm_ros_msg` - the ROS2 topic for HSM simple messages;
 * `/hsm_ros_str_msg` - the ROS2 topic for HSM string messages.
-* `/hsm_ros_num_msg` - the ROS2 topic for HSM number messages.
+
+The topic for the number messages is reserved for the first module reporting a numeric
+value and is not created yet.
 
 ## The Code Structure
 	
@@ -118,3 +121,38 @@ this implementation:
 
 The long-term storage of the `Storage` module is kept on the local disk in the
 `~/.hsm_robot/storage` directory, a single JSON file per storage.
+
+## The Testing
+
+The API is tested on several layers, from the static checks of the sources up to the whole
+framework running against a robot simulator. The layers relevant to this package are the
+node layer, testing a single API module node through the ROS2 objects it declares, and the
+integration layer, testing the API modules together with the HSM controller generated from
+a diagram.
+
+The list of the ROS2 objects above is what makes the API testable. The API modules never
+talk to a robot directly: they publish and subscribe the standard topics, so any node
+implementing those topics can stand in for the robot. Two such nodes are used:
+
+* `turtle_driver` - the driver of the turtlesim simulator, the platform the framework
+  ships with;
+* the fake robot node of the testing project - a simple simulation backend with no
+  graphics and no wall clock, driven by the tests.
+
+The fake robot node implements the same topics as the turtle driver and adds the laser
+scan the turtlesim simulator cannot provide, so the obstacle detection of the navigation
+module can be tested as well.
+
+     the API module nodes           the robot
+    +--------------------+       +---------------+
+    |  navigation.py     |       | turtle_driver | --- the turtlesim simulator
+    |  wheels.py         | <---> |      or       |
+    |  pump.py, ...      |       | the fake robot| --- the tests
+    +--------------------+       +---------------+
+        /cmd_vel, /odom, /scan, /goal_pose, /pump
+
+The tests of the API module nodes are located in the `test` directory of this package. The
+testing architecture of the whole framework, the fake robot contract and the integration
+and system tests are described in the testing project:
+https://github.com/kruzhok-team/hsm_robot_ros_tests, the document
+`docs/hsm_robot_testing.md`.
