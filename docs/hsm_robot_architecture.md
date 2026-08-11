@@ -22,7 +22,7 @@ Here is the architectural scheme of the API implementation:
     |                |                    wheels_caller.py                              wheels.py
     |                |                  +-------------------+                       +-----------------+
     | HSM Controller | --- methods ---> |      Wheels       | --- service call ---> |   Wheels Node   |
-    |      Node      | <-- events ----- | (the caller node) | <-- STOP_COMPLETED --- |  (ROS2 impl.)   |
+    |      Node      | <-- events ----- | (the caller node) | <-- events----------- |  (ROS2 impl.)   |
     |                |                  +-------------------+                       +-----------------+
     |   (based on    |
     |  HSM diagram)  |                    pump_caller.py                                 pump.py
@@ -34,7 +34,7 @@ Here is the architectural scheme of the API implementation:
     |                |                    storage_caller.py                             storage.py
     |                |                  +-------------------+                       +-----------------+
     |                | --- methods ---> |      Storage      | --- service call ---> |  Storage Node   |
-    |                |                  | (the caller node) | <-- the stored data -- |  (local disk)   |
+    |                |                  | (the caller node) | <-- the stored data - |  (local disk)   |
     |                |                  |  (the data cache) |                       +-----------------+
     |                |                  +-------------------+
     |                |
