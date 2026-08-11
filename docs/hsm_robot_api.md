@@ -8,9 +8,9 @@ about the world (navigation, maps, etc.), constructing paths, and so on.
 The methods available:
 
 * `move_to_point(x, y, theta=None)` – move to point with the coordinates `(x, y)` and the
-targe angle `theta` radians;
+target angle `theta` radians;
 * `stop()` – stop movement;
-* `get_point()` – return the pair `(x, y, theta)` of the robot's current position.
+* `get_point()` – return the triple `(x, y, theta)` of the robot's current position.
 
 The events available:
 
@@ -20,9 +20,9 @@ current implementation);
 raised by the current implementation);
 * `MOVE_COMPLETED` – the movement was completed, i.e. the robot came closer to the target
 point than the goal tolerance;
-* `COLLISION_WARNING` – the possible collision detecion warning;
+* `COLLISION_WARNING` – the possible collision detection warning;
 * `COLLISION_DETECTED` – the collision detection;
-* `RIGHT_OPEN_SPACE` – there is free space to the right of the robot (the disance if
+* `RIGHT_OPEN_SPACE` – there is free space to the right of the robot (the distance is
 fixed now - 0.5 m).
 
 The `Navigation` module moves the robot with the wheels, therefore using `Navigation`
@@ -44,7 +44,7 @@ The methods available:
 * `forward(v)` – go forward with the speed `v` m/sec;
 * `back(v)` – go back with the speed of `v` m/sec;
 * `turn_right(w)` – turn clockwise with the angular speed `w` radians/sec;
-* `turn_left(w)` – turn contr-clockwise with the angular speed `w` radians/sec;
+* `turn_left(w)` – turn counter-clockwise with the angular speed `w` radians/sec;
 * `stop()` – stop movement.
 
 The events available:
@@ -73,8 +73,8 @@ None.
 The methods available:
 
 * `start(self, timeout, repeat=False, name='default')` – start timer with the name `name` on
-`timeout` seconda and auto-repeat flag `repeat`;
-*`stop(name='default')` – stop the timer named `name`.
+`timeout` seconds and auto-repeat flag `repeat`;
+* `stop(name='default')` – stop the timer named `name`.
 
 The events available:
 
@@ -87,13 +87,13 @@ The events available:
 
 ## Debug Module
 
-`Debug` module interface provides logging output for debug purposes. It uses ROS2 debug logging
+`Debug` module interface provides logging output for debug purposes. It uses the ROS2 logging
 in this implementation.
 
 The methods available:
 
-* `print(s)` – print the string `s` to a debug log;
-* `println(s)` – print the string `s` followed by a new line characters to a debug log.
+* `print(s)` – print the string `s` to a log;
+* `println(s)` – print the string `s` followed by a new line character to a log.
 
 The events available:
 
