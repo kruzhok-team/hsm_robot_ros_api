@@ -124,24 +124,8 @@ The long-term storage of the `Storage` module is kept on the local disk in the
 
 ## The Testing
 
-The API is tested on several layers, from the static checks of the sources up to the whole
-framework running against a robot simulator. The layers relevant to this package are the
-node layer, testing a single API module node through the ROS2 objects it declares, and the
-integration layer, testing the API modules together with the HSM controller generated from
-a diagram.
-
-The list of the ROS2 objects above is what makes the API testable. The API modules never
-talk to a robot directly: they publish and subscribe the standard topics, so any node
-implementing those topics can stand in for the robot. Two such nodes are used:
-
-* `turtle_driver` - the driver of the turtlesim simulator, the platform the framework
-  ships with;
-* the fake robot node of the testing project - a simple simulation backend with no
-  graphics and no wall clock, driven by the tests.
-
-The fake robot node implements the same topics as the turtle driver and adds the laser
-scan the turtlesim simulator cannot provide, so the obstacle detection of the navigation
-module can be tested as well.
+The ROS2 objects listed above are what makes the API testable. The modules never talk to a
+robot directly, so any node implementing those topics can stand in for one:
 
      the API module nodes           the robot
     +--------------------+       +---------------+
@@ -151,8 +135,9 @@ module can be tested as well.
     +--------------------+       +---------------+
         /cmd_vel, /odom, /scan, /goal_pose, /pump
 
-The tests of the API module nodes are located in the `test` directory of this package. The
-testing architecture of the whole framework, the fake robot contract and the integration
-and system tests are described in the testing project:
-https://github.com/kruzhok-team/hsm_robot_ros_tests, the document
-`docs/hsm_robot_testing.md`.
+The fake robot node adds the laser scan turtlesim cannot provide, so the obstacle detection
+of the navigation module is testable as well.
+
+The tests of the module nodes are located in the `test` directory of this package. The
+testing architecture of the whole framework is described in the testing project -
+https://github.com/kruzhok-team/hsm_robot_ros_tests, `docs/hsm_robot_testing.md`.
