@@ -21,18 +21,28 @@
 #
 # -----------------------------------------------------------------------------
 
-MESSAGES_TOPIC = '/hsm_ros_msg' # the ROS2 topic for HSM messages
-STR_MESSAGES_TOPIC = '/hsm_ros_str_msg' # the ROS2 topic for HSM messages with
-                                        # the single string argument
-ODOMETRY_TOPIC = '/odom'        # the ROS2 odometry topic
-LASER_TOPIC = '/scan'           # the ROS2 laser scan topic
-PUMP_TOPIC = '/pump'            # the ROS2 pump control topic
-FRAME_ID = 'hsm_ros_api'        # the ROS2 frame for HSM messages
-MSG_QUEUE_LEN = 10              # the ROS2 messages queue length
-LOOP_TIME = 0.05                # loop timer
-TICK_LEN = 0.1                  # tick event timer
-DEFAULT_TIMER = 'default'       # the default timer name
-GOAL_TOLERANCE = 0.05           # the distance to the target point (m) which is
-                                # close enough to report MOVE_COMPLETED; retune
-                                # it for the particular robot platform
-STORAGE_PATH = '~/.hsm_robot/storage' # the local long-term storage directory
+# the ROS2 topic for HSM messages
+MESSAGES_TOPIC = '/hsm_ros_msg'
+# the ROS2 topic for HSM messages with the single string argument
+STR_MESSAGES_TOPIC = '/hsm_ros_str_msg'
+# the ROS2 odometry topic
+ODOMETRY_TOPIC = '/odom'
+# the ROS2 laser scan topic
+LASER_TOPIC = '/scan'
+# the ROS2 pump control topic
+PUMP_TOPIC = '/pump'
+# the ROS2 frame for HSM messages
+FRAME_ID = 'hsm_ros_api'
+# the ROS2 messages queue length
+MSG_QUEUE_LEN = 10
+# loop timer
+LOOP_TIME = 0.05
+# tick event timer
+TICK_LEN = 0.1
+# the default timer name
+DEFAULT_TIMER = 'default'
+# the distance to the target point (m) which is close enough to report
+# MOVE_COMPLETED; retune it for the particular robot platform
+GOAL_TOLERANCE = 0.05
+# the local long-term storage directory
+STORAGE_PATH = '~/.hsm_robot/storage'

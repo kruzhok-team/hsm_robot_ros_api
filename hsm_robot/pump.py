@@ -29,6 +29,7 @@ import hsm_interfaces.srv
 
 from std_msgs.msg import Bool
 
+
 class ROSPump(rclpy.node.Node):
 
     OBJECT_NAME = 'hsm_ros_pump'
@@ -68,6 +69,7 @@ class ROSPump(rclpy.node.Node):
         response.ok = True
         return response
 
+
 def main(args=None):
     rclpy.init(args=args)
     node = ROSPump()
@@ -78,6 +80,7 @@ def main(args=None):
     finally:
         node.destroy_node()
         rclpy.try_shutdown()
+
 
 if __name__ == "__main__":
     main()

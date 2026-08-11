@@ -34,6 +34,7 @@ import hsm_robot.constants
 import hsm_interfaces.msg
 import hsm_interfaces.srv
 
+
 class ROSNavigation(rclpy.node.Node):
 
     OBJECT_NAME = 'hsm_ros_navigation'
@@ -174,6 +175,7 @@ class ROSNavigation(rclpy.node.Node):
         response.ok = True
         return response
 
+
 def main(args=None):
     rclpy.init(args=args)
     node = ROSNavigation()
@@ -184,6 +186,7 @@ def main(args=None):
     finally:
         node.destroy_node()
         rclpy.try_shutdown()
+
 
 if __name__ == "__main__":
     main()

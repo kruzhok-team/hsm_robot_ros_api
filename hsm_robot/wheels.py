@@ -33,6 +33,7 @@ import hsm_interfaces.srv
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 
+
 class ROSWheels(rclpy.node.Node):
 
     OBJECT_NAME = 'hsm_ros_wheels'
@@ -91,9 +92,9 @@ class ROSWheels(rclpy.node.Node):
         wz = msg.twist.twist.angular.z
         v = math.sqrt(vx ** 2 + vy ** 2 + vz ** 2)
         if (abs(v) < self.LINEAR_SPEED_THRESHOLD and
-            abs(wx) < self.ANGULAR_SPEED_THRESHOLD and
-            abs(wy) < self.ANGULAR_SPEED_THRESHOLD and
-            abs(wz) < self.ANGULAR_SPEED_THRESHOLD):
+                abs(wx) < self.ANGULAR_SPEED_THRESHOLD and
+                abs(wy) < self.ANGULAR_SPEED_THRESHOLD and
+                abs(wz) < self.ANGULAR_SPEED_THRESHOLD):
             if not self.__stopped:
                 event = hsm_interfaces.msg.SimpleMessage()
                 event.code = hsm_interfaces.msg.SimpleMessage.MSG_WHEELS_STOP_COMPLETED
@@ -147,6 +148,7 @@ class ROSWheels(rclpy.node.Node):
         response.ok = True
         return response
 
+
 def main(args=None):
     rclpy.init(args=args)
     node = ROSWheels()
@@ -157,6 +159,7 @@ def main(args=None):
     finally:
         node.destroy_node()
         rclpy.try_shutdown()
+
 
 if __name__ == "__main__":
     main()

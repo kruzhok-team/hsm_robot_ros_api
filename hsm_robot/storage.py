@@ -30,6 +30,7 @@ from rclpy.executors import ExternalShutdownException
 import hsm_robot.constants
 import hsm_interfaces.srv
 
+
 class ROSStorage(rclpy.node.Node):
 
     OBJECT_NAME = 'hsm_ros_storage'
@@ -133,6 +134,7 @@ class ROSStorage(rclpy.node.Node):
             response.ok = False
         return response
 
+
 def main(args=None):
     rclpy.init(args=args)
     node = ROSStorage()
@@ -143,6 +145,7 @@ def main(args=None):
     finally:
         node.destroy_node()
         rclpy.try_shutdown()
+
 
 if __name__ == "__main__":
     main()
