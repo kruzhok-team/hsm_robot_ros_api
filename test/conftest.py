@@ -20,11 +20,12 @@
 #
 # -----------------------------------------------------------------------------
 
-# The fixtures come from the testing project, so the node tests of this package and the
-# integration tests share one vocabulary. They are imported here to be visible to pytest.
+# The fixtures come from the test utilities of the framework, so the node tests of this
+# package and the integration tests share one vocabulary. They are imported here to be
+# visible to pytest.
 
-from hsm_tests.test_utils import (isolated_domain, node_factory,  # noqa: F401
-                                  storage_directory)
+from hsm_test_utils import (isolated_domain, node_factory,  # noqa: F401
+                            storage_directory)
 
 from nav_msgs.msg import Odometry
 
