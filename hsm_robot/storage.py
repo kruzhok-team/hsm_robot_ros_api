@@ -28,6 +28,7 @@ import rclpy.node
 from rclpy.executors import ExternalShutdownException
 
 import hsm_robot.constants
+from hsm_robot.parameters import declare
 import hsm_interfaces.srv
 
 
@@ -50,7 +51,10 @@ class ROSStorage(rclpy.node.Node):
         self.__service_load = self.create_service(hsm_interfaces.srv.StorageLoad,
                                                   self.LOAD_SERVICE,
                                                   self.on_load_call)
-        self.__storage_path = os.path.expanduser(hsm_robot.constants.STORAGE_PATH)
+        storage_path = declare(
+            self, 'storage_path', hsm_robot.constants.STORAGE_PATH,
+            'the directory of the long-term storage, one JSON file per storage')
+        self.__storage_path = os.path.expanduser(storage_path)
         # the storages already written to the disk are picked up lazily by load(), so
         # the node keeps in memory only what the current diagram has touched
         self.__storages = {}

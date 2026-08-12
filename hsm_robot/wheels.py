@@ -27,6 +27,7 @@ import rclpy.node
 from rclpy.executors import ExternalShutdownException
 
 import hsm_robot.constants
+from hsm_robot.parameters import declare
 import hsm_interfaces.msg
 import hsm_interfaces.srv
 
@@ -43,11 +44,20 @@ class ROSWheels(rclpy.node.Node):
     TURN_RIGHT_SERVICE = 'hsm_ros_wheels_turn_right'
     TURN_LEFT_SERVICE = 'hsm_ros_wheels_turn_left'
     VELOCITY_TOPIC = '/cmd_vel'
-    LINEAR_SPEED_THRESHOLD = 0.001
-    ANGULAR_SPEED_THRESHOLD = 0.001
 
     def __init__(self):
         rclpy.node.Node.__init__(self, self.OBJECT_NAME)
+        # the speed below which the robot counts as stopped; retune it for the platform,
+        # a noisy odometry never reports an exact zero
+        self.linear_speed_threshold = declare(
+            self, 'linear_speed_threshold', 0.001,
+            'the linear speed (m/s) below which the robot counts as stopped')
+        self.angular_speed_threshold = declare(
+            self, 'angular_speed_threshold', 0.001,
+            'the angular speed (rad/s) below which the robot counts as stopped')
+        queue_length = declare(
+            self, 'message_queue_length', hsm_robot.constants.MSG_QUEUE_LEN,
+            'the length of the ROS2 message queues')
         # the stop latch has to be ready before the odometry subscription is created,
         # otherwise an early /odom message reaches the callback before the attribute
         # exists; True means "no motion seen yet", so no STOP_COMPLETED is emitted
@@ -70,14 +80,14 @@ class ROSWheels(rclpy.node.Node):
                                                        self.on_turn_left_call)
         self.__twist_publisher = self.create_publisher(Twist,
                                                        self.VELOCITY_TOPIC,
-                                                       hsm_robot.constants.MSG_QUEUE_LEN)
+                                                       queue_length)
         self.__msg_publisher = self.create_publisher(hsm_interfaces.msg.SimpleMessage,
                                                      hsm_robot.constants.MESSAGES_TOPIC,
-                                                     hsm_robot.constants.MSG_QUEUE_LEN)
+                                                     queue_length)
         self.__odom_subscriber = self.create_subscription(Odometry,
                                                           hsm_robot.constants.ODOMETRY_TOPIC,
                                                           self.odom_callback,
-                                                          hsm_robot.constants.MSG_QUEUE_LEN)
+                                                          queue_length)
 
         self.get_logger().info('ROSWheels service node initialized')
 
@@ -91,10 +101,10 @@ class ROSWheels(rclpy.node.Node):
         wy = msg.twist.twist.angular.y
         wz = msg.twist.twist.angular.z
         v = math.sqrt(vx ** 2 + vy ** 2 + vz ** 2)
-        if (abs(v) < self.LINEAR_SPEED_THRESHOLD and
-                abs(wx) < self.ANGULAR_SPEED_THRESHOLD and
-                abs(wy) < self.ANGULAR_SPEED_THRESHOLD and
-                abs(wz) < self.ANGULAR_SPEED_THRESHOLD):
+        if (abs(v) < self.linear_speed_threshold and
+                abs(wx) < self.angular_speed_threshold and
+                abs(wy) < self.angular_speed_threshold and
+                abs(wz) < self.angular_speed_threshold):
             if not self.__stopped:
                 event = hsm_interfaces.msg.SimpleMessage()
                 event.code = hsm_interfaces.msg.SimpleMessage.MSG_WHEELS_STOP_COMPLETED

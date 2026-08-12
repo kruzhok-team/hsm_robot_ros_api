@@ -31,6 +31,7 @@ from nav_msgs.msg import Odometry
 from sensor_msgs.msg import LaserScan
 
 import hsm_robot.constants
+from hsm_robot.parameters import declare
 import hsm_interfaces.msg
 import hsm_interfaces.srv
 
@@ -42,12 +43,28 @@ class ROSNavigation(rclpy.node.Node):
     STOP_SERVICE = 'hsm_ros_navigation_stop'
     NAVIGATION_MODULE_TOPIC = '/goal_pose'
     STOP_MESSAGE_FRAME_ID = '__CANCEL_NAV__'
-    OBSTACLE_RANGE = 0.45
-    OPEN_SPACE_RANGE = 0.5
-    SCAN_WINDOW = 0.0873  # +/- 5 degrees around the inspected scan direction
 
     def __init__(self):
         rclpy.node.Node.__init__(self, self.OBJECT_NAME)
+        # the ranges and the tolerance are retuned for the particular robot platform
+        self.goal_tolerance = declare(
+            self, 'goal_tolerance', hsm_robot.constants.GOAL_TOLERANCE,
+            'the distance to the target point (m) close enough to report MOVE_COMPLETED')
+        self.obstacle_range = declare(
+            self, 'obstacle_range', 0.45,
+            'the distance to an obstacle (m) reported as COLLISION_WARNING')
+        self.collision_range = declare(
+            self, 'collision_range', 0.15,
+            'the distance to an obstacle (m) reported as COLLISION_DETECTED')
+        self.open_space_range = declare(
+            self, 'open_space_range', 0.5,
+            'the free distance to the right (m) reported as RIGHT_OPEN_SPACE')
+        self.scan_window = declare(
+            self, 'scan_window', 0.0873,
+            'the half width (rad) of the scan sector inspected around a direction')
+        queue_length = declare(
+            self, 'message_queue_length', hsm_robot.constants.MSG_QUEUE_LEN,
+            'the length of the ROS2 message queues')
         # the goal has to be ready before the odometry subscription is created, otherwise
         # an early /odom message reaches the callback before the attribute exists;
         # None means "no target requested", so MOVE_COMPLETED is emitted only after an
@@ -55,7 +72,7 @@ class ROSNavigation(rclpy.node.Node):
         self.__goal = None
         self.__msg_publisher = self.create_publisher(hsm_interfaces.msg.SimpleMessage,
                                                      hsm_robot.constants.MESSAGES_TOPIC,
-                                                     hsm_robot.constants.MSG_QUEUE_LEN)
+                                                     queue_length)
         self.__service_move_to_point = self.create_service(hsm_interfaces.srv.NavigationMoveToPoint,
                                                            self.MOVE_TO_POINT_SERVICE,
                                                            self.on_move_to_point_call)
@@ -64,15 +81,15 @@ class ROSNavigation(rclpy.node.Node):
                                                   self.on_stop_call)
         self.__goal_publisher = self.create_publisher(PoseStamped,
                                                       self.NAVIGATION_MODULE_TOPIC,
-                                                      hsm_robot.constants.MSG_QUEUE_LEN)
+                                                      queue_length)
         self.__odom_subscriber = self.create_subscription(Odometry,
                                                           hsm_robot.constants.ODOMETRY_TOPIC,
                                                           self.odom_callback,
-                                                          hsm_robot.constants.MSG_QUEUE_LEN)
+                                                          queue_length)
         self.__scan_subscriber = self.create_subscription(LaserScan,
                                                           hsm_robot.constants.LASER_TOPIC,
                                                           self.scan_callback,
-                                                          hsm_robot.constants.MSG_QUEUE_LEN)
+                                                          queue_length)
         self.get_logger().info('ROSNavigation service node initialized')
 
     def __path_found(self):
@@ -82,14 +99,14 @@ class ROSNavigation(rclpy.node.Node):
 
     def odom_callback(self, msg):
         # process odometry: the target point is reached when the robot comes closer to it
-        # than GOAL_TOLERANCE. The wheels module reports STOP_COMPLETED on its own, so
+        # than the goal tolerance. The wheels module reports STOP_COMPLETED on its own, so
         # only the movement goal is tracked here
         if self.__goal is None:
             return
         goal_x, goal_y = self.__goal
         dx = goal_x - msg.pose.pose.position.x
         dy = goal_y - msg.pose.pose.position.y
-        if math.sqrt(dx ** 2 + dy ** 2) > hsm_robot.constants.GOAL_TOLERANCE:
+        if math.sqrt(dx ** 2 + dy ** 2) > self.goal_tolerance:
             return
         # the goal is dropped before the event is published, so the arrival is reported
         # once per move_to_point call and not on every odometry message that follows
@@ -100,14 +117,14 @@ class ROSNavigation(rclpy.node.Node):
         self.get_logger().info('ROSNavigation MSG_NAVIGATION_MOVE_COMPLETED')
 
     def __beam_min(self, msg, angle):
-        # the smallest valid range within +/- SCAN_WINDOW around the requested angle;
+        # the smallest valid range within +/- the scan window around the requested angle;
         # the indices are derived from the scan header instead of being hardcoded, so
         # the result does not depend on the scanner orientation
         # returns None when the sector carries no valid measurement
         if msg.angle_increment == 0.0:
             return None
         check_limits = msg.range_max > msg.range_min
-        half = max(1, int(self.SCAN_WINDOW / abs(msg.angle_increment)))
+        half = max(1, int(self.scan_window / abs(msg.angle_increment)))
         center = int(round((angle - msg.angle_min) / msg.angle_increment))
         result = None
         for i in range(center - half, center + half + 1):
@@ -134,7 +151,7 @@ class ROSNavigation(rclpy.node.Node):
         self.get_logger().info('cent={} right={}'.format(center_dist, right_dist),
                                throttle_duration_sec=1.0)
 
-        if right_dist is not None and right_dist > self.OPEN_SPACE_RANGE:
+        if right_dist is not None and right_dist > self.open_space_range:
             event = hsm_interfaces.msg.SimpleMessage()
             event.code = hsm_interfaces.msg.SimpleMessage.MSG_NAVIGATION_RIGHT_OPEN_SPACE
             self.__msg_publisher.publish(event)
@@ -143,12 +160,12 @@ class ROSNavigation(rclpy.node.Node):
         if center_dist is None:
             return
 
-        if center_dist < self.OBSTACLE_RANGE / 3:
+        if center_dist < self.collision_range:
             event = hsm_interfaces.msg.SimpleMessage()
             event.code = hsm_interfaces.msg.SimpleMessage.MSG_NAVIGATION_COLLISION_DETECTED
             self.__msg_publisher.publish(event)
             self.get_logger().info('ROSNavigation MSG_NAVIGATION_COLLISION_DETECTED')
-        elif center_dist < self.OBSTACLE_RANGE:
+        elif center_dist < self.obstacle_range:
             event = hsm_interfaces.msg.SimpleMessage()
             event.code = hsm_interfaces.msg.SimpleMessage.MSG_NAVIGATION_COLLISION_WARNING
             self.__msg_publisher.publish(event)

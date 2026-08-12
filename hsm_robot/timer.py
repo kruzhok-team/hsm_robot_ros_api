@@ -26,6 +26,7 @@ import rclpy.node
 from rclpy.executors import ExternalShutdownException
 
 import hsm_robot.constants
+from hsm_robot.parameters import declare
 import hsm_interfaces.msg
 import hsm_interfaces.srv
 
@@ -39,12 +40,26 @@ class ROSTimer(rclpy.node.Node):
 
     def __init__(self):
         rclpy.node.Node.__init__(self, self.OBJECT_NAME)
+        # the tick periods are measured by the node clock, so they follow the simulated
+        # time when the node is started with use_sim_time
+        self.tick_period = declare(
+            self, 'tick_period', hsm_robot.constants.TICK_LEN,
+            'the period (s) of the TIMER_TICK event')
+        self.second_period = declare(
+            self, 'second_period', 1.0,
+            'the period (s) of the TIMER_TICK_1S event')
+        self.minute_period = declare(
+            self, 'minute_period', 60.0,
+            'the period (s) of the TIMER_TICK_1M event')
+        queue_length = declare(
+            self, 'message_queue_length', hsm_robot.constants.MSG_QUEUE_LEN,
+            'the length of the ROS2 message queues')
         self.__msg_publisher = self.create_publisher(hsm_interfaces.msg.SimpleMessage,
                                                      hsm_robot.constants.MESSAGES_TOPIC,
-                                                     hsm_robot.constants.MSG_QUEUE_LEN)
+                                                     queue_length)
         self.__str_msg_publisher = self.create_publisher(hsm_interfaces.msg.StringArgMessage,
                                                          hsm_robot.constants.STR_MESSAGES_TOPIC,
-                                                         hsm_robot.constants.MSG_QUEUE_LEN)
+                                                         queue_length)
         self.__service_tick = self.create_service(hsm_interfaces.srv.TimerTicks,
                                                   self.TICK_SERVICE,
                                                   self.on_init_ticks_call)
@@ -100,11 +115,11 @@ class ROSTimer(rclpy.node.Node):
             self.destroy_timer(self.__minute_timer)
             self.__minute_timer = None
         if request.run_ticks:
-            self.__tick_timer = self.create_timer(hsm_robot.constants.TICK_LEN, self.__tick_timer_callback)
+            self.__tick_timer = self.create_timer(self.tick_period, self.__tick_timer_callback)
         if request.run_ticks_1sec:
-            self.__second_timer = self.create_timer(1.0, self.__second_timer_callback)
+            self.__second_timer = self.create_timer(self.second_period, self.__second_timer_callback)
         if request.run_ticks_1min:
-            self.__minute_timer = self.create_timer(60.0, self.__minute_timer_callback)
+            self.__minute_timer = self.create_timer(self.minute_period, self.__minute_timer_callback)
         response.ok = True
         return response
 

@@ -25,6 +25,7 @@ import rclpy.node
 from rclpy.executors import ExternalShutdownException
 
 import hsm_robot.constants
+from hsm_robot.parameters import declare
 import hsm_interfaces.srv
 
 from std_msgs.msg import Bool
@@ -38,6 +39,9 @@ class ROSPump(rclpy.node.Node):
 
     def __init__(self):
         rclpy.node.Node.__init__(self, self.OBJECT_NAME)
+        queue_length = declare(
+            self, 'message_queue_length', hsm_robot.constants.MSG_QUEUE_LEN,
+            'the length of the ROS2 message queues')
         self.__service_turn_on = self.create_service(hsm_interfaces.srv.PumpTurnOn,
                                                      self.TURN_ON_SERVICE,
                                                      self.on_turn_on_call)
@@ -46,7 +50,7 @@ class ROSPump(rclpy.node.Node):
                                                       self.on_turn_off_call)
         self.__pump_publisher = self.create_publisher(Bool,
                                                       hsm_robot.constants.PUMP_TOPIC,
-                                                      hsm_robot.constants.MSG_QUEUE_LEN)
+                                                      queue_length)
 
         self.get_logger().info('ROSPump service node initialized')
 

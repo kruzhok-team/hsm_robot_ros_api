@@ -90,6 +90,11 @@ The events available:
 `Debug` module interface provides logging output for debug purposes. It uses the ROS2 logging
 in this implementation.
 
+The level the messages are written with is set by the `log_level` parameter of the debug
+node - `debug`, `info` (the default), `warn` or `error`. It is not the level the logger
+passes on, which is set by the standard `--log-level` option: the diagram may write at the
+debug level and leave the info level to the framework itself.
+
 The methods available:
 
 * `print(s)` – print the string `s` to a log;

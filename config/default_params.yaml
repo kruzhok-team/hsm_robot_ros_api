@@ -1,0 +1,62 @@
+# -----------------------------------------------------------------------------
+# The Cyberiada HSM-to-ROS2 library
+#
+# The default parameters of the HSM Robot API nodes
+#
+# Copyright (C) 2026 Alexey Fedoseev <aleksey@fedoseev.net>
+#
+# -----------------------------------------------------------------------------
+#
+# The values below are the defaults built into the nodes: the file documents them and is
+# the place to retune them for a particular robot platform. The topic and the service
+# names are not parameters - they are changed by the ROS2 remapping of the node.
+#
+# The keys are the names the nodes give themselves, which is how they are called both
+# under ros2 launch and under ros2 run.
+
+hsm_ros_navigation:
+  ros__parameters:
+    # the distance to the target point (m) close enough to report MOVE_COMPLETED
+    goal_tolerance: 0.05
+    # the distance to an obstacle (m) reported as COLLISION_WARNING
+    obstacle_range: 0.45
+    # the distance to an obstacle (m) reported as COLLISION_DETECTED
+    collision_range: 0.15
+    # the free distance to the right (m) reported as RIGHT_OPEN_SPACE
+    open_space_range: 0.5
+    # the half width (rad) of the scan sector inspected around a direction
+    scan_window: 0.0873
+    message_queue_length: 10
+
+hsm_ros_wheels:
+  ros__parameters:
+    # the speeds below which the robot counts as stopped and STOP_COMPLETED is reported
+    linear_speed_threshold: 0.001
+    angular_speed_threshold: 0.001
+    message_queue_length: 10
+
+hsm_ros_timer:
+  ros__parameters:
+    # the periods of the tick events. They are measured by the node clock, so they follow
+    # the simulated time when the node is started with use_sim_time
+    tick_period: 0.1
+    second_period: 1.0
+    minute_period: 60.0
+    message_queue_length: 10
+
+hsm_ros_storage:
+  ros__parameters:
+    # the directory of the long-term storage, one JSON file per storage
+    storage_path: "~/.hsm_robot/storage"
+
+hsm_ros_pump:
+  ros__parameters:
+    message_queue_length: 10
+
+hsm_ros_debug:
+  ros__parameters:
+    # the level the messages of the diagram are logged with: debug, info, warn or error.
+    # It is not the level the logger passes on, which is set by the standard --log-level
+    # option: the diagram may write at the debug level and leave the info level to the
+    # framework itself
+    log_level: "info"

@@ -122,6 +122,37 @@ this implementation:
 The long-term storage of the `Storage` module is kept on the local disk in the
 `~/.hsm_robot/storage` directory, a single JSON file per storage.
 
+## The Configuration
+
+The module nodes are configured the ROS2 way, and the two mechanisms are used for what
+each of them is meant for.
+
+The **names** - the topics and the services - are the contract between the nodes and are
+changed by the ROS2 remapping, which renames them for the node it is applied to:
+
+    ros2 run hsm_robot navigation_node --ros-args -r /odom:=/robot/odom
+
+The **values** - the tolerances, the ranges, the timer periods, the storage directory -
+are the node parameters. They are read once, while the node is built, and their defaults
+are the values the modules were tuned with for the turtlesim platform:
+
+    ros2 run hsm_robot navigation_node --ros-args -p goal_tolerance:=0.2
+
+The launch file passes a parameter file to every node, `config/default_params.yaml` by
+default, which lists every parameter with its default value and its meaning:
+
+    ros2 launch hsm_robot start.launch.py params_file:=my_robot.yaml
+
+The nodes are not renamed by the launch file, so a node is called the way it names itself
+(`hsm_ros_navigation` and so on) whether it is started by the launch file or by `ros2 run`,
+and the same parameter file applies in both cases.
+
+The controller generated from a diagram carries two parameters of its own,
+`service_startup_timeout` and `service_startup_limit`: how often it checks for the module
+services of the API and how long it waits before reporting that one is missing. Its node
+name depends on the diagram (`<state machine>_hsm_controller`), so its parameters are set
+inline or through a `/**` block rather than by a file shipped with the framework.
+
 ## The Testing
 
 The ROS2 objects listed above are what makes the API testable. The modules never talk to a

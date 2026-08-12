@@ -24,6 +24,7 @@ import rclpy
 import rclpy.node
 from rclpy.executors import ExternalShutdownException
 
+from hsm_robot.parameters import declare
 import hsm_interfaces.srv
 
 
@@ -31,17 +32,30 @@ class ROSDebug(rclpy.node.Node):
 
     OBJECT_NAME = 'hsm_ros_debug'
     PRINT_SERVICE = 'hsm_ros_debug_print'
+    DEFAULT_LOG_LEVEL = 'info'
+    LOG_LEVELS = ('debug', 'info', 'warn', 'error')
 
     def __init__(self):
         rclpy.node.Node.__init__(self, self.OBJECT_NAME)
+        # the level the messages of the diagram are logged with. It is not the level the
+        # logger passes on, which is set by the standard --log-level option: the diagram
+        # may write at the debug level and leave the info level to the framework
+        level = declare(
+            self, 'log_level', self.DEFAULT_LOG_LEVEL,
+            'the logging level of the diagram messages: {}'.format(', '.join(self.LOG_LEVELS)))
+        if level not in self.LOG_LEVELS:
+            self.get_logger().error('Unknown log level "{}", using {}'.format(
+                level, self.DEFAULT_LOG_LEVEL))
+            level = self.DEFAULT_LOG_LEVEL
+        self.__log = getattr(self.get_logger(), level)
         self.__service_print = self.create_service(hsm_interfaces.srv.DebugPrint,
                                                    self.PRINT_SERVICE,
                                                    self.on_print_call)
-        self.get_logger().info('ROSDebug service node initialized')
+        self.get_logger().info('ROSDebug service node initialized ({})'.format(level))
 
     def on_print_call(self, request, response):
         # Debug.print implementation
-        self.get_logger().info('Debug.print: {}'.format(request.s))
+        self.__log('Debug.print: {}'.format(request.s))
         response.ok = True
         return response
 

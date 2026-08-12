@@ -1,10 +1,9 @@
 # -----------------------------------------------------------------------------
 # The Cyberiada HSM-to-ROS2 library
 #
-# The ROS2 implementation constants
+# The ROS2 parameter declaration helper
 #
 # Copyright (C) 2026 Alexey Fedoseev <aleksey@fedoseev.net>
-# Copyright (C) 2026 Anastasia Viktorova <viktorovaa.04@gmail.com>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -21,24 +20,13 @@
 #
 # -----------------------------------------------------------------------------
 
-# the ROS2 topic for HSM messages
-MESSAGES_TOPIC = '/hsm_ros_msg'
-# the ROS2 topic for HSM messages with the single string argument
-STR_MESSAGES_TOPIC = '/hsm_ros_str_msg'
-# the ROS2 odometry topic
-ODOMETRY_TOPIC = '/odom'
-# the ROS2 laser scan topic
-LASER_TOPIC = '/scan'
-# the ROS2 pump control topic
-PUMP_TOPIC = '/pump'
-# the ROS2 messages queue length
-MSG_QUEUE_LEN = 10
-# tick event timer
-TICK_LEN = 0.1
-# the default timer name
-DEFAULT_TIMER = 'default'
-# the distance to the target point (m) which is close enough to report
-# MOVE_COMPLETED; retune it for the particular robot platform
-GOAL_TOLERANCE = 0.05
-# the local long-term storage directory
-STORAGE_PATH = '~/.hsm_robot/storage'
+from rcl_interfaces.msg import ParameterDescriptor
+
+
+def declare(node, name, default, description):
+    # declare a node parameter and return its value. The parameters are read once, while
+    # the node is built, so the value is kept in the attribute the code used to read from
+    # the constants; the topic and the service names are not parameters, they are changed
+    # by the ROS2 remapping of the node
+    node.declare_parameter(name, default, ParameterDescriptor(description=description))
+    return node.get_parameter(name).value
