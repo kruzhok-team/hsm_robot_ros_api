@@ -169,6 +169,17 @@ robot directly, so any node implementing those topics can stand in for one:
 The fake robot node adds the laser scan turtlesim cannot provide, so the obstacle detection
 of the navigation module is testable as well.
 
-The tests of the module nodes are located in the `test` directory of this package. The
-testing architecture of the whole framework is described in the testing project -
-https://github.com/kruzhok-team/hsm_robot_ros_tests, `docs/hsm_robot_testing.md`.
+The tests of the module nodes are located in the `test` directory of this package. They are
+the L2 tier: one node at a time, driven through the ROS2 objects it declares, with the
+fixtures of the `hsm_test_utils` package - `node_factory` builds the node and its probe, and
+parameter overrides reach it through `rclpy.init`, because the node classes take no
+constructor arguments. `test_debug_node.py` is the pattern on one screen.
+
+```
+colcon test --packages-select hsm_robot --pytest-args -m node
+```
+
+The testing architecture of the whole framework, and the recipe for adding a test to any of
+its tiers, are described in the testing project -
+https://github.com/kruzhok-team/hsm_robot_ros_tests, `docs/hsm_robot_testing.md` and
+`docs/howto_write_a_test.md`.
