@@ -29,10 +29,11 @@ from sensor_msgs.msg import LaserScan
 
 from conftest import GOAL_TOPIC, ODOMETRY_TOPIC, LASER_TOPIC, odometry
 from hsm_interfaces.msg import SimpleMessage
-from hsm_interfaces.srv import NavigationMoveToPoint, NavigationStop
+from hsm_interfaces.srv import NavigationMoveAlongTraj, NavigationMoveToPoint, NavigationStop
 from hsm_robot.navigation import ROSNavigation
 
 MOVE_COMPLETED = SimpleMessage.MSG_NAVIGATION_MOVE_COMPLETED
+POINT_PASSED = SimpleMessage.MSG_NAVIGATION_POINT_PASSED
 COLLISION_WARNING = SimpleMessage.MSG_NAVIGATION_COLLISION_WARNING
 COLLISION_DETECTED = SimpleMessage.MSG_NAVIGATION_COLLISION_DETECTED
 RIGHT_OPEN_SPACE = SimpleMessage.MSG_NAVIGATION_RIGHT_OPEN_SPACE
@@ -66,6 +67,18 @@ def move_to(probe, x, y):
     request.pose.pose.position.x = float(x)
     request.pose.pose.position.y = float(y)
     return probe.call('hsm_ros_navigation_move_to_point', NavigationMoveToPoint, request)
+
+
+def move_along(probe, points):
+    request = NavigationMoveAlongTraj.Request()
+    poses = []
+    for x, y in points:
+        pose = PoseStamped()
+        pose.pose.position.x = float(x)
+        pose.pose.position.y = float(y)
+        poses.append(pose)
+    request.poses = poses
+    return probe.call('hsm_ros_navigation_move_along_traj', NavigationMoveAlongTraj, request)
 
 
 def test_move_to_point_publishes_the_goal(node_factory):
@@ -122,6 +135,77 @@ def test_stop_cancels_the_arrival(node_factory):
     ctx.probe.call('hsm_ros_navigation_stop', NavigationStop)
     ctx.probe.publish(ODOMETRY_TOPIC, odometry(x=1.0))
     ctx.probe.expect_no_event(MOVE_COMPLETED)
+
+
+def test_a_trajectory_starts_with_its_first_point(node_factory):
+    ctx = node_factory(ROSNavigation, goal_tolerance=0.5)
+    goals = ctx.probe.record(GOAL_TOPIC, PoseStamped)
+    assert move_along(ctx.probe, [(1.0, 0.0), (2.0, 0.0)]).ok
+    # the driver of the platform always sees a single goal: the rest of the trajectory
+    # stays in the module until the robot arrives
+    assert ctx.probe.wait_for(lambda: len(goals) == 1)
+    assert (goals[0].pose.position.x, goals[0].pose.position.y) == (1.0, 0.0)
+
+
+def test_a_passed_point_publishes_the_next_goal(node_factory):
+    ctx = node_factory(ROSNavigation, goal_tolerance=0.5)
+    goals = ctx.probe.record(GOAL_TOPIC, PoseStamped)
+    move_along(ctx.probe, [(1.0, 0.0), (2.0, 0.0)])
+    assert ctx.probe.wait_for(lambda: len(goals) == 1)
+    ctx.probe.publish(ODOMETRY_TOPIC, odometry(x=1.0))
+    ctx.probe.wait_for_event(POINT_PASSED)
+    assert ctx.probe.wait_for(lambda: len(goals) == 2)
+    assert (goals[1].pose.position.x, goals[1].pose.position.y) == (2.0, 0.0)
+    # the route is not over while a point is left
+    assert ctx.probe.count_events(MOVE_COMPLETED) == 0
+
+
+def test_the_last_point_completes_the_movement(node_factory):
+    ctx = node_factory(ROSNavigation, goal_tolerance=0.5)
+    goals = ctx.probe.record(GOAL_TOPIC, PoseStamped)
+    move_along(ctx.probe, [(1.0, 0.0), (2.0, 0.0), (3.0, 0.0)])
+    for point in range(1, 4):
+        assert ctx.probe.wait_for(lambda expected=point: len(goals) == expected)
+        ctx.probe.publish(ODOMETRY_TOPIC, odometry(x=float(point)))
+        assert ctx.probe.wait_for(
+            lambda expected=point: ctx.probe.count_events(POINT_PASSED) == expected)
+    ctx.probe.wait_for_event(MOVE_COMPLETED)
+    # every point of the route is reported, and the completion once after the last one
+    assert ctx.probe.count_events(POINT_PASSED) == 3
+    assert ctx.probe.count_events(MOVE_COMPLETED) == 1
+    assert len(goals) == 3
+
+
+def test_move_to_point_reports_no_passed_point(node_factory):
+    ctx = node_factory(ROSNavigation, goal_tolerance=0.5)
+    move_to(ctx.probe, 1.0, 0.0)
+    ctx.probe.publish(ODOMETRY_TOPIC, odometry(x=1.0))
+    ctx.probe.wait_for_event(MOVE_COMPLETED)
+    # a passed point belongs to a trajectory: a single movement is completed, not passed
+    assert ctx.probe.count_events(POINT_PASSED) == 0
+
+
+def test_stop_cancels_the_rest_of_the_trajectory(node_factory):
+    ctx = node_factory(ROSNavigation, goal_tolerance=0.5)
+    goals = ctx.probe.record(GOAL_TOPIC, PoseStamped)
+    move_along(ctx.probe, [(1.0, 0.0), (2.0, 0.0)])
+    assert ctx.probe.wait_for(lambda: len(goals) == 1)
+    ctx.probe.call('hsm_ros_navigation_stop', NavigationStop)
+    ctx.probe.publish(ODOMETRY_TOPIC, odometry(x=1.0))
+    ctx.probe.publish(ODOMETRY_TOPIC, odometry(x=2.0))
+    ctx.probe.expect_no_event(POINT_PASSED)
+    assert ctx.probe.count_events(MOVE_COMPLETED) == 0
+
+
+def test_an_empty_trajectory_completes_at_once(node_factory):
+    ctx = node_factory(ROSNavigation)
+    goals = ctx.probe.record(GOAL_TOPIC, PoseStamped)
+    assert move_along(ctx.probe, []).ok
+    # there is nothing to travel, and a diagram waiting for the completion has to be
+    # released instead of waiting for an event which can never arrive
+    ctx.probe.wait_for_event(MOVE_COMPLETED)
+    assert ctx.probe.count_events(POINT_PASSED) == 0
+    assert goals == []
 
 
 def test_close_obstacle_reports_a_collision(node_factory):

@@ -9,6 +9,9 @@ The methods available:
 
 * `move_to_point(x, y, theta=None)` – move to point with the coordinates `(x, y)` and the
 target angle `theta` radians;
+* `move_along_traj(traj)` – move along the trajectory `traj`, the sequence of the points to
+pass in order. A point is the pair `(x, y)` or the triple `(x, y, theta)`, the same way
+`move_to_point` takes them;
 * `stop()` – stop movement;
 * `get_point()` – return the triple `(x, y, theta)` of the robot's current position.
 
@@ -18,12 +21,20 @@ The events available:
 current implementation);
 * `PATH_NOT_FOUND` – the path to the target point cannot be built (declared, but not
 raised by the current implementation);
+* `POINT_PASSED` – the next point of the trajectory was passed;
 * `MOVE_COMPLETED` – the movement was completed, i.e. the robot came closer to the target
 point than the goal tolerance;
 * `COLLISION_WARNING` – the possible collision detection warning;
 * `COLLISION_DETECTED` – the collision detection;
 * `RIGHT_OPEN_SPACE` – there is free space to the right of the robot (the distance is
 fixed now - 0.5 m).
+
+The `move_along_traj(traj)` method keeps the whole trajectory in the module: the robot is
+sent to the first point of it, and the next point becomes the target as soon as the current
+one is achieved. Every achieved point raises `POINT_PASSED`, and `MOVE_COMPLETED` follows
+the last one. A single `move_to_point()` movement raises `MOVE_COMPLETED` only – there is no
+trajectory to pass a point of – and `stop()` cancels the whole trajectory, not just the
+point the robot is travelling to.
 
 The `Navigation` module moves the robot with the wheels, therefore using `Navigation`
 implies using the `Wheels` module: the `Wheels` events (`STOP_COMPLETED`) are available in
@@ -115,7 +126,10 @@ The methods available:
 * `add(name, point)` – save the `point` to the storage `name`;
 * `load(name)` – load the set of numeric arrays named `name` from file to memory;
 * `next(name)` – get the next point from the storage `name`;
-* `has_data(name)` – the next point availability flag for the storage `name`.
+* `has_data(name)` – the next point availability flag for the storage `name`;
+* `points(name)` – get the whole storage `name` as the array of points, e.g. to pass the
+saved path to `Navigation.move_along_traj()`. The method does not move the `next()` reading
+position and returns the empty array for an unknown storage.
 
 A point is the array of numbers, e.g. the pair of coordinates; the single number is
 accepted as well and is stored as the array of one element. The `next(name)` method

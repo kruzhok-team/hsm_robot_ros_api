@@ -51,8 +51,13 @@ would stop the controller node:
 
 * `Navigation.get_point()` reads the robot position from the odometry topic and returns the
   cached value;
-* `Storage.next()` and `Storage.has_data()` read the data cache filled by the
-  `Storage.load()` call.
+* `Storage.next()`, `Storage.has_data()` and `Storage.points()` read the data cache filled
+  by the `Storage.load()` call.
+
+The navigation node keeps the trajectory of `Navigation.move_along_traj()` and publishes its
+points to `/goal_pose` one at a time, the next one as soon as the current one is achieved.
+The driver of the platform therefore always sees a single goal and needs no knowledge of the
+trajectories.
 
 ## The HSM Modules Dependencies
 

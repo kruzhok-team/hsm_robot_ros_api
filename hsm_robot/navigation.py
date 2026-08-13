@@ -40,6 +40,7 @@ class ROSNavigation(rclpy.node.Node):
 
     OBJECT_NAME = 'hsm_ros_navigation'
     MOVE_TO_POINT_SERVICE = 'hsm_ros_navigation_move_to_point'
+    MOVE_ALONG_TRAJ_SERVICE = 'hsm_ros_navigation_move_along_traj'
     STOP_SERVICE = 'hsm_ros_navigation_stop'
     NAVIGATION_MODULE_TOPIC = '/goal_pose'
     STOP_MESSAGE_FRAME_ID = '__CANCEL_NAV__'
@@ -65,17 +66,22 @@ class ROSNavigation(rclpy.node.Node):
         queue_length = declare(
             self, 'message_queue_length', hsm_robot.constants.MSG_QUEUE_LEN,
             'the length of the ROS2 message queues')
-        # the goal has to be ready before the odometry subscription is created, otherwise
-        # an early /odom message reaches the callback before the attribute exists;
-        # None means "no target requested", so MOVE_COMPLETED is emitted only after an
-        # actual move_to_point call
-        self.__goal = None
+        # the goals have to be ready before the odometry subscription is created, otherwise
+        # an early /odom message reaches the callback before the attribute exists; the empty
+        # queue means "no target requested", so MOVE_COMPLETED is emitted only after an
+        # actual move request. The flag tells the goals of a trajectory from a single point:
+        # a passed point is reported by move_along_traj only
+        self.__goals = []
+        self.__traj = False
         self.__msg_publisher = self.create_publisher(hsm_interfaces.msg.SimpleMessage,
                                                      hsm_robot.constants.MESSAGES_TOPIC,
                                                      queue_length)
         self.__service_move_to_point = self.create_service(hsm_interfaces.srv.NavigationMoveToPoint,
                                                            self.MOVE_TO_POINT_SERVICE,
                                                            self.on_move_to_point_call)
+        self.__service_move_along_traj = self.create_service(hsm_interfaces.srv.NavigationMoveAlongTraj,
+                                                             self.MOVE_ALONG_TRAJ_SERVICE,
+                                                             self.on_move_along_traj_call)
         self.__service_stop = self.create_service(hsm_interfaces.srv.NavigationStop,
                                                   self.STOP_SERVICE,
                                                   self.on_stop_call)
@@ -97,24 +103,42 @@ class ROSNavigation(rclpy.node.Node):
         msg.code = hsm_interfaces.msg.SimpleMessage.MSG_NAVIGATION_PATH_FOUND
         self.__msg_publisher.publish(msg)
 
+    def __event(self, code, name):
+        event = hsm_interfaces.msg.SimpleMessage()
+        event.code = code
+        self.__msg_publisher.publish(event)
+        self.get_logger().info('ROSNavigation {}'.format(name))
+
+    def __publish_goal(self):
+        # the point the robot travels to now; the driver of the platform always sees a
+        # single goal, the trajectory is kept here
+        pose = self.__goals[0]
+        pose.header.stamp = self.get_clock().now().to_msg()
+        self.__goal_publisher.publish(pose)
+
     def odom_callback(self, msg):
         # process odometry: the target point is reached when the robot comes closer to it
         # than the goal tolerance. The wheels module reports STOP_COMPLETED on its own, so
-        # only the movement goal is tracked here
-        if self.__goal is None:
+        # only the movement goals are tracked here
+        if not self.__goals:
             return
-        goal_x, goal_y = self.__goal
-        dx = goal_x - msg.pose.pose.position.x
-        dy = goal_y - msg.pose.pose.position.y
+        goal = self.__goals[0].pose.position
+        dx = goal.x - msg.pose.pose.position.x
+        dy = goal.y - msg.pose.pose.position.y
         if math.sqrt(dx ** 2 + dy ** 2) > self.goal_tolerance:
             return
-        # the goal is dropped before the event is published, so the arrival is reported
-        # once per move_to_point call and not on every odometry message that follows
-        self.__goal = None
-        event = hsm_interfaces.msg.SimpleMessage()
-        event.code = hsm_interfaces.msg.SimpleMessage.MSG_NAVIGATION_MOVE_COMPLETED
-        self.__msg_publisher.publish(event)
-        self.get_logger().info('ROSNavigation MSG_NAVIGATION_MOVE_COMPLETED')
+        # the point is dropped before the events are published, so each of them is reported
+        # once and not on every odometry message that follows
+        self.__goals.pop(0)
+        if self.__traj:
+            self.__event(hsm_interfaces.msg.SimpleMessage.MSG_NAVIGATION_POINT_PASSED,
+                         'MSG_NAVIGATION_POINT_PASSED')
+        if self.__goals:
+            self.__publish_goal()
+        else:
+            self.__traj = False
+            self.__event(hsm_interfaces.msg.SimpleMessage.MSG_NAVIGATION_MOVE_COMPLETED,
+                         'MSG_NAVIGATION_MOVE_COMPLETED')
 
     def __beam_min(self, msg, angle):
         # the smallest valid range within +/- the scan window around the requested angle;
@@ -175,8 +199,27 @@ class ROSNavigation(rclpy.node.Node):
         # Navigation.move_to_point implementation
         pose = request.pose
         self.get_logger().info('Navigation.move_to_point({})'.format(pose))
-        self.__goal = (pose.pose.position.x, pose.pose.position.y)
-        self.__goal_publisher.publish(pose)
+        self.__goals = [pose]
+        self.__traj = False
+        self.__publish_goal()
+        response.ok = True
+        return response
+
+    def on_move_along_traj_call(self, request, response):
+        # Navigation.move_along_traj implementation: the next goal is published when the
+        # current point is reached, so the trajectory is travelled point by point
+        self.get_logger().info('Navigation.move_along_traj({} point(s))'.format(len(request.poses)))
+        self.__goals = list(request.poses)
+        self.__traj = True
+        if self.__goals:
+            self.__publish_goal()
+        else:
+            # nothing to travel; the movement is reported completed at once, otherwise the
+            # diagram would wait for an event which can never arrive
+            self.get_logger().warn('Navigation.move_along_traj(): the trajectory is empty')
+            self.__traj = False
+            self.__event(hsm_interfaces.msg.SimpleMessage.MSG_NAVIGATION_MOVE_COMPLETED,
+                         'MSG_NAVIGATION_MOVE_COMPLETED')
         response.ok = True
         return response
 
@@ -184,8 +227,10 @@ class ROSNavigation(rclpy.node.Node):
         # Navigation.stop implementation
         self.get_logger().info('Navigation.stop()')
         # a cancelled movement must not report MOVE_COMPLETED later, even if the robot
-        # coasts into the abandoned target point
-        self.__goal = None
+        # coasts into the abandoned target point; the whole trajectory is cancelled, not
+        # only the point the robot travels to
+        self.__goals = []
+        self.__traj = False
         empty_pose = PoseStamped()
         empty_pose.header.frame_id = self.STOP_MESSAGE_FRAME_ID
         self.__goal_publisher.publish(empty_pose)
