@@ -87,7 +87,9 @@ class ROSStorage(rclpy.node.Node):
         array = list(request.array)
         self.get_logger().info('Storage.new({}, {})'.format(name, array))
         try:
-            self.__storages[name] = [array]
+            # an empty array creates an empty storage: a point carries at least one
+            # number, so there is no point to store
+            self.__storages[name] = [array] if array else []
             self.__write_storage(name)
             response.ok = True
         except (ValueError, OSError) as e:

@@ -63,6 +63,17 @@ def test_a_new_storage_is_written_to_the_disk(node_factory, storage_directory):
         assert json.load(f) == [[1.0, 2.0]]
 
 
+def test_a_storage_is_created_empty(node_factory, storage_directory):
+    ctx = node_factory(ROSStorage, storage_path=storage_directory)
+    # a diagram which is about to collect the points starts the storage without an array,
+    # and an empty array is not a point: the storage holds nothing, not one empty point
+    assert new(ctx.probe, 'path', []).ok
+    add(ctx.probe, 'path', [1.0, 2.0])
+    response = load(ctx.probe, 'path')
+    assert list(response.data) == [1.0, 2.0]
+    assert list(response.lengths) == [2]
+
+
 def test_a_stored_array_is_read_back(node_factory, storage_directory):
     ctx = node_factory(ROSStorage, storage_path=storage_directory)
     new(ctx.probe, 'path', [1.0, 2.0])

@@ -122,7 +122,8 @@ the local disk.
 
 The methods available:
 
-* `new(name, array)` – create the numeric `array` at the local storage named `name`;
+* `new(name, array=None)` – create the local storage named `name` holding the numeric
+`array`, or an empty one when no array is given;
 * `add(name, point)` – save the `point` to the storage `name`;
 * `load(name)` – load the set of numeric arrays named `name` from file to memory;
 * `next(name)` – get the next point from the storage `name`;
