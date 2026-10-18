@@ -158,6 +158,23 @@ services of the API and how long it waits before reporting that one is missing. 
 name depends on the diagram (`<state machine>_hsm_controller`), so its parameters are set
 inline or through a `/**` block rather than by a file shipped with the framework.
 
+## The Development Workflow
+
+The diagrams are drawn in the CyberiadaPro editor. Its `hsm-ros2` plugin ("HSM ROS2",
+`hsm_robot_ros_generator/editor-plugin`) runs the generator and colcon in the ROS2
+environment, so the whole cycle stays in the editor:
+
+     CyberiadaPro                hsm-ros2 plugin               ROS2
+    +-------------+  check    +------------------+         +------------------------+
+    |  diagram    | --------> | hsm_generator    | ------> | diagnostics -> editor  |
+    |  (.graphml) |  generate |  --check / -o    | ------> | WS/src/hsm_controller  |
+    |             |  build    | colcon build     | ------> | WS/install             |
+    +-------------+           +------------------+         +------------------------+
+                                                                  |
+                                     ros2 launch hsm_robot ... + ros2 run hsm_controller ...
+
+The plugin is specified in `hsm_robot_ros_generator/docs/editor_plugin.md`.
+
 ## The Testing
 
 The ROS2 objects listed above are what makes the API testable. The modules never talk to a
