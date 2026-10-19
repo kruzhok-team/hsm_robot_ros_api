@@ -169,6 +169,8 @@ environment, so the whole cycle stays in the editor:
     |  diagram    | --------> | hsm_generator    | ------> | diagnostics -> editor  |
     |  (.graphml) |  generate |  --check / -o    | ------> | WS/src/hsm_controller  |
     |             |  build    | colcon build     | ------> | WS/install             |
+    |             |  test     | hsm_robot_test   | ------> | the fake robot: events |
+    |             |           |                  |         |  vs 'ros2 hsm test'    |
     +-------------+           +------------------+         +------------------------+
                                                                   |
                                      ros2 launch hsm_robot ... + ros2 run hsm_controller ...
