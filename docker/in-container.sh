@@ -92,7 +92,7 @@ ros_env() {
 
 do_debs() {
     stage_debs "$DIST" /tmp/hsm-debs
-    apt-get install -y --no-install-recommends /tmp/hsm-debs/*.deb
+    "$RETRY" apt-get install -y --no-install-recommends /tmp/hsm-debs/*.deb
 }
 
 # copy_tree SRC DST: a source tree without its VCS, build output and caches (the
@@ -106,7 +106,7 @@ shutil.copytree(sys.argv[1], sys.argv[2], symlinks=True, ignore=shutil.ignore_pa
 }
 
 do_rosdep() {
-    rosdep install --from-paths "$WS/src" --ignore-src -y --rosdistro "$DISTRO"
+    "$RETRY" rosdep install --from-paths "$WS/src" --ignore-src -y --rosdistro "$DISTRO"
 }
 
 do_build() {
@@ -164,7 +164,10 @@ do_plugin() {
 mkdir -p "$WS" "$LOGS"
 say "HSM-ROS2 on ROS 2 $DISTRO: $PHASES (workspace $WS)"
 
-if phase apt; then check apt apt-get update; fi
+# the network steps are retried (the docker/retry script)
+RETRY="$here/retry"
+
+if phase apt; then check apt "$RETRY" apt-get update; fi
 if phase debs; then check debs do_debs; fi
 if phase copy; then check copy do_copy; fi
 if phase rosdep; then check rosdep do_rosdep; fi

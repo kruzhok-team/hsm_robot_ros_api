@@ -9,6 +9,8 @@
 #                        (run-gui.sh)
 #
 # The images are stable: build them once, rebuild when the toolchain changes.
+# A build broken by the network is retried (--retries): Docker continues from the
+# last finished layer and the apt cache keeps the downloaded .debs.
 #
 # Copyright (C) 2026 Alexey Fedoseev <aleksey@fedoseev.net>
 #
@@ -24,6 +26,8 @@ IMAGES="test dev gui"
 DIST_ARG=""
 MIRROR="ru.archive.ubuntu.com"
 REBUILD=0
+RETRIES=3
+NETWORK=""
 
 usage() {
     cat <<EOF
@@ -32,6 +36,8 @@ usage: $0 [options]
   --dist DIR       the toolchain .debs (default: ~/sources/dist, ~/devel/dist, ../dist)
   --mirror HOST    apt mirror host baked into the images (default: "$MIRROR"; "" stock)
   --rebuild        rebuild an image even if it already exists
+  --retries N      attempts per image on a failure, e.g. the network (default: $RETRIES)
+  --host-network   build with the host network (its DNS, proxy, VPN)
   -h, --help       this help
 
 Builds $TEST_IMAGE, $DEV_IMAGE (with the toolchain of the dist dir) and
@@ -45,6 +51,8 @@ while [ $# -gt 0 ]; do
         --dist) DIST_ARG="$2"; shift 2 ;;
         --mirror) MIRROR="$2"; shift 2 ;;
         --rebuild) REBUILD=1; shift ;;
+        --retries) RETRIES="$2"; shift 2 ;;
+        --host-network) NETWORK="--network host"; shift ;;
         -h|--help) usage; exit 0 ;;
         *) echo "unknown option: $1" >&2; usage; exit 2 ;;
     esac
@@ -68,13 +76,26 @@ fresh() {
     say "building $1"
 }
 
-common="--build-arg ROS_DISTRO=$ROS_DISTRO_NAME"
+common="--build-arg ROS_DISTRO=$ROS_DISTRO_NAME $NETWORK"
+
+# build_image TAG CONTEXT [ARGS...]: docker_build, repeated after a failure; each
+# attempt continues from the cached layers
+build_image() {
+    attempt=1
+    until docker_build "$@"; do
+        [ "$attempt" -lt "$RETRIES" ] || die "image $1 failed after $RETRIES attempts"
+        wait=$((30 * attempt))
+        say "image $1: attempt $attempt/$RETRIES failed, again in ${wait}s (cached layers are kept)"
+        sleep "$wait"
+        attempt=$((attempt + 1))
+    done
+}
 
 if wanted test && fresh "$TEST_IMAGE"; then
     mkdir -p "$ctx/test"
-    cp "$here/test/Dockerfile" "$ctx/test/"
+    cp "$here/test/Dockerfile" "$here/retry" "$ctx/test/"
     # shellcheck disable=SC2086
-    docker_build "$TEST_IMAGE" "$ctx/test" $common \
+    build_image "$TEST_IMAGE" "$ctx/test" $common \
         --build-arg "UBUNTU_VERSION=$UBUNTU_VERSION" --build-arg "APT_MIRROR_HOST=$MIRROR"
 fi
 
@@ -87,7 +108,7 @@ if wanted dev && fresh "$DEV_IMAGE"; then
     stage_debs "$DIST" "$ctx/dev/debs"
     ls "$ctx/dev/debs"
     # shellcheck disable=SC2086
-    docker_build "$DEV_IMAGE" "$ctx/dev" $common --build-arg "BASE_IMAGE=$TEST_IMAGE"
+    build_image "$DEV_IMAGE" "$ctx/dev" $common --build-arg "BASE_IMAGE=$TEST_IMAGE"
 fi
 
 if wanted gui && fresh "$GUI_IMAGE"; then
@@ -96,7 +117,7 @@ if wanted gui && fresh "$GUI_IMAGE"; then
     mkdir -p "$ctx/gui"
     cp "$here/gui/Dockerfile" "$here/hsm-ros2-init" "$ctx/gui/"
     # shellcheck disable=SC2086
-    docker_build "$GUI_IMAGE" "$ctx/gui" $common --build-arg "BASE_IMAGE=$DEV_IMAGE" \
+    build_image "$GUI_IMAGE" "$ctx/gui" $common --build-arg "BASE_IMAGE=$DEV_IMAGE" \
         --build-arg "USERNAME=$(id -un)" --build-arg "USER_UID=$(id -u)" \
         --build-arg "USER_GID=$(id -g)" --build-arg "USER_HOME=$HOME"
 fi

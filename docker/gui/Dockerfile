@@ -14,13 +14,16 @@ ARG USER_UID=1000
 ARG USER_GID=1000
 ARG USER_HOME=/home/hsm
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# the desktop is the largest download: retried, and the .debs of a failed attempt
+# stay in the apt cache
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    retry sh -c "apt-get update && apt-get install -y --no-install-recommends \
         ros-${ROS_DISTRO}-desktop \
         mesa-utils libgl1-mesa-dri libglx-mesa0 libegl1 \
         qtwayland5 libxcb-cursor0 xauth x11-xserver-utils \
         fonts-dejavu-core fonts-liberation fonts-noto-core \
-        sudo bash-completion nano vim openssh-client \
-    && rm -rf /var/lib/apt/lists/*
+        sudo bash-completion nano vim openssh-client"
 
 # the host user replaces a stock one of the same uid/gid (ubuntu, 1000)
 RUN old=$(getent passwd "${USER_UID}" | cut -d: -f1); \

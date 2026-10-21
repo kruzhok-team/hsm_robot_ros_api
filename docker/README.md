@@ -23,6 +23,7 @@ Three images, each built on the previous one, and the scripts that drive them:
 | `in-container.sh` | the build/test phases, run inside the dev and test containers. |
 | `lib.sh` | the common part of the scripts: names, the dist lookup, the .deb staging. |
 | `hsm-ros2-env.sh` | sources ROS 2 and `$HSM_ROS2_WS/install` in every shell of the images. |
+| `retry` | repeats a failing network command (in the images: `/usr/local/bin/retry`). |
 | `hsm-ros2-init` | (gui) builds the workspace and installs the CyberiadaPro `hsm-ros2` plugin. |
 
 ## Prerequisites
@@ -44,6 +45,19 @@ Three images, each built on the previous one, and the scripts that drive them:
 
     docker/test-docker.sh                         # the clean test, RESULT jazzy PASS|FAIL
                                                   # logs: <dist>/test-logs/ros2-jazzy/
+
+### A flaky network
+
+The network steps do not break the build at the first failure:
+
+- each one (apt, the ROS apt source download, `rosdep init/update`, and in the clean test the
+  apt, .deb and rosdep phases) runs under `retry` (5 attempts, growing pauses; `RETRY_TIMES`,
+  `RETRY_DELAY`), and apt itself retries the downloads with timeouts;
+- each network step is a layer of its own and the downloaded .debs stay in the BuildKit apt
+  cache, so a failed image build is repeated by `build-images.sh` (`--retries N`, default 3)
+  from the last finished layer, without downloading again;
+- `--host-network` builds with the host network (its DNS, proxy, VPN) when the hosts resolve on
+  the host but not in the build; `--mirror ""` drops the country mirror.
 
 The tiers are those of `hsm_robot_ros_tests/docs/hsm_robot_testing.md`: L0 linter, L1 unit (the
 generator), L2 node, L3 integration, L4 system (turtlesim, headless).

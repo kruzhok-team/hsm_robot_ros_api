@@ -5,6 +5,10 @@
 # test-docker.sh, so a dependency missing in a package.xml fails the test.
 #
 #   docker build -t hsm-ros2-test:jazzy docker/test    (see build-images.sh)
+#
+# The network steps survive a flaky network: each is retried (retry, apt
+# retries), each is a layer of its own (a rebuild continues after the last good
+# one) and the downloaded .debs stay in the BuildKit apt cache between attempts.
 # -----------------------------------------------------------------------------
 ARG UBUNTU_VERSION=24.04
 FROM ubuntu:${UBUNTU_VERSION}
@@ -16,9 +20,10 @@ ARG APT_MIRROR_HOST=ru.archive.ubuntu.com
 ARG ROS_DISTRO=jazzy
 ARG ROS_APT_SOURCE_VERSION=1.1.0
 
-# the ROS 2 apt repository comes with the ros2-apt-source package (key + source);
-# ros-dev-tools gives colcon, rosdep, vcstool and the compiler; ru_RU.UTF-8 is
-# generated for the editor's locale-dependent output
+COPY retry /usr/local/bin/retry
+
+# apt retries with timeouts, fails an update on any unreachable index (so retry
+# repeats it) and keeps the .debs for the cache mounts (no docker-clean)
 RUN if [ -n "${APT_MIRROR_HOST}" ]; then \
         for f in /etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources; do \
             if [ -f "$f" ]; then \
@@ -26,19 +31,38 @@ RUN if [ -n "${APT_MIRROR_HOST}" ]; then \
             fi; \
         done; \
     fi \
-    && apt-get update && apt-get install -y --no-install-recommends \
-        ca-certificates curl locales tzdata \
-    && codename=$(. /etc/os-release && echo "$VERSION_CODENAME") \
-    && curl -fsSL -o /tmp/ros2-apt-source.deb \
+    && rm -f /etc/apt/apt.conf.d/docker-clean \
+    && printf '%s\n' \
+        'Acquire::Retries "10";' \
+        'Acquire::http::Timeout "30";' \
+        'Acquire::https::Timeout "30";' \
+        'APT::Update::Error-Mode "any";' \
+        'Binary::apt::APT::Keep-Downloaded-Packages "true";' \
+        > /etc/apt/apt.conf.d/80-hsm-network
+
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    retry sh -c "apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates curl locales tzdata"
+
+# the ROS 2 apt repository comes with the ros2-apt-source package (key + source)
+RUN codename=$(. /etc/os-release && echo "$VERSION_CODENAME") \
+    && retry curl -fsSL --connect-timeout 30 -o /tmp/ros2-apt-source.deb \
         "https://github.com/ros-infrastructure/ros-apt-source/releases/download/${ROS_APT_SOURCE_VERSION}/ros2-apt-source_${ROS_APT_SOURCE_VERSION}.${codename}_all.deb" \
-    && apt-get install -y /tmp/ros2-apt-source.deb \
-    && rm -f /tmp/ros2-apt-source.deb \
-    && apt-get update && apt-get install -y --no-install-recommends \
-        ros-${ROS_DISTRO}-ros-core ros-dev-tools \
-    && sed -i -E '/(en_US|ru_RU)\.UTF-8/s/^# //' /etc/locale.gen \
-    && locale-gen \
-    && rosdep init && rosdep update --rosdistro "${ROS_DISTRO}" \
-    && rm -rf /var/lib/apt/lists/*
+    && dpkg -i /tmp/ros2-apt-source.deb \
+    && rm -f /tmp/ros2-apt-source.deb
+
+# ros-dev-tools gives colcon, rosdep, vcstool and the compiler
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    retry sh -c "apt-get update && apt-get install -y --no-install-recommends \
+        ros-${ROS_DISTRO}-ros-core ros-dev-tools"
+
+# ru_RU.UTF-8 for the editor's locale-dependent output
+RUN sed -i -E '/(en_US|ru_RU)\.UTF-8/s/^# //' /etc/locale.gen && locale-gen
+
+RUN if [ ! -f /etc/ros/rosdep/sources.list.d/20-default.list ]; then retry rosdep init; fi \
+    && retry rosdep update --rosdistro "${ROS_DISTRO}"
 
 # the tests (the editor, turtlesim) run headless
 ENV ROS_DISTRO=${ROS_DISTRO} QT_QPA_PLATFORM=offscreen
