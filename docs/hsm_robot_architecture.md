@@ -177,6 +177,20 @@ environment, so the whole cycle stays in the editor:
 
 The plugin is specified in `hsm_robot_ros_generator/docs/editor_plugin.md`.
 
+## The Containers
+
+The framework is built, tested and used in three Ubuntu 24.04 / ROS 2 Jazzy images
+(`docker/`, see `docker/README.md`), each on the previous one:
+
+     dist/*.deb (Cyberiada toolchain)     the ros2 repos (mounted)
+            |                                   |
+     hsm-ros2-test  ROS core, colcon, rosdep  --> test-docker.sh   clean build + L0..L4
+     hsm-ros2-dev   + deps, toolchain         --> build-docker.sh  build + L0..L4
+     hsm-ros2-gui   + rviz2, rqt, the user    --> run-gui.sh       CyberiadaPro on the host display
+
+The everyday container is persistent and mounts the original sources and the workspace at
+their host paths, so the editor, the plugin and colcon work there as on the host.
+
 ## The Testing
 
 The ROS2 objects listed above are what makes the API testable. The modules never talk to a

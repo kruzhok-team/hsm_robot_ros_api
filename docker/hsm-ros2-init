@@ -1,0 +1,28 @@
+#!/bin/bash
+# -----------------------------------------------------------------------------
+# Build the mounted HSM-ROS2 workspace and install the CyberiadaPro hsm-ros2
+# plugin for the user (the gui container). The extra arguments go to colcon build.
+#
+# Copyright (C) 2026 Alexey Fedoseev <aleksey@fedoseev.net>
+#
+# This program is free software; you can redistribute it and/or modify it under
+# the terms of the GNU Lesser General Public License, version 3 or later.
+# -----------------------------------------------------------------------------
+set -eu
+
+ws=${HSM_ROS2_WS:?the workspace is not set (run the container with run-gui.sh)}
+src=${HSM_ROS2_SRC:-$ws/src}
+
+set +u
+. "/opt/ros/$ROS_DISTRO/setup.bash"
+set -u
+
+mkdir -p "$ws"
+cd "$ws"
+colcon build --base-paths "$src" "$@"
+
+set +u
+. "$ws/install/setup.bash"
+set -u
+ros2 run hsm_generator hsm_generator --install-editor-plugin
+echo "done: open a new shell (or source $ws/install/setup.bash) and run CyberiadaPro"

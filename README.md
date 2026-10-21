@@ -26,3 +26,6 @@ in the testing project - https://github.com/kruzhok-team/hsm_robot_ros_tests
 * ROS 2 Jazzy
 * The API interfaces - https://github.com/kruzhok-team/hsm-robot-ros-interfaces
 
+The Docker images to build, test and use the framework (with CyberiadaPro, rviz2 and rqt)
+are described in `docker/README.md`.
+
