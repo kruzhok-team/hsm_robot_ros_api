@@ -1,15 +1,16 @@
 #!/bin/sh
 # -----------------------------------------------------------------------------
 # Build and test the HSM-ROS2 packages inside a container. Run by build-docker.sh
-# (the dev image, as the host user) and test-docker.sh (the clean test image, as
-# root), never on a host: the test phases install packages.
+# (the dev image) and test-docker.sh (the clean test image) as root, never on a
+# host: the first phases install packages. With HSM_OWNER (uid:gid) the phases
+# from copy on run as that user (setpriv), so the workspace stays the user's.
 #
-# Phases (HSM_PHASES):
+# Phases (HSM_PHASES), in this order:
 #   apt      apt-get update                                       (root)
 #   debs     install the toolchain .debs of $HSM_DIST              (root)
-#   copy     copy the read-only repos $HSM_SRC to $HSM_WS/src, without the VCS,
-#            the build output and the caches
-#   rosdep   install the package.xml dependencies                  (root)
+#   rosdep   install the package.xml dependencies of $HSM_SRC      (root)
+#   copy     copy the read-only ROS repos of $HSM_SRC to $HSM_WS/src,
+#            without the VCS, the build output and the caches
 #   build    colcon build
 #   tests    the test tiers $HSM_TIERS (L0 linter, L1 unit, L2 node,
 #            L3 integration, L4 system)
@@ -42,7 +43,8 @@ DISTRO=${ROS_DISTRO:-$ROS_DISTRO_NAME}
 export PYTHONDONTWRITEBYTECODE=1 ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST QT_QPA_PLATFORM=offscreen
 export ROS_LOG_DIR="$WS/ros-log"
 
-npass=0; nfail=0; nskip=0; failed=""; finished=0
+# the counts of the root phases come along when the user phases are re-executed
+npass=${HSM_PASS:-0}; nfail=${HSM_FAIL:-0}; nskip=${HSM_SKIP:-0}; failed=${HSM_FAILED:-}; finished=0
 
 pass() { npass=$((npass + 1)); echo "PASS  $1"; }
 skip() { nskip=$((nskip + 1)); echo "SKIP  $1 ($2)"; }
@@ -99,14 +101,32 @@ do_debs() {
 # generator repo may carry a stray build/ and install/ of its own)
 do_copy() {
     rm -rf "$WS/src"
-    python3 -c "import shutil, sys
+    mkdir -p "$WS/src"
+    for r in $(ros2_repos "$SRC"); do
+        python3 -c "import shutil, sys
 shutil.copytree(sys.argv[1], sys.argv[2], symlinks=True, ignore=shutil.ignore_patterns(
     '.git', 'build', 'install', 'log', '__pycache__', '*.egg-info', '.pytest_cache'))" \
-        "$SRC" "$WS/src"
+            "$r" "$WS/src/$(basename "$r")"
+    done
 }
 
+# rosdep reads only the package.xml files: straight from the read-only repos
 do_rosdep() {
-    "$RETRY" rosdep install --from-paths "$WS/src" --ignore-src -y --rosdistro "$DISTRO"
+    "$RETRY" rosdep install --from-paths "$SRC" --ignore-src -y --rosdistro "$DISTRO"
+}
+
+# the phases from copy on as $HSM_OWNER: this script again, with the counts
+drop_to_owner() {
+    rest=""
+    for p in $PHASES; do
+        case "$p" in apt|debs|rosdep) ;; *) rest="$rest${rest:+ }$p" ;; esac
+    done
+    [ -n "$rest" ] || return 0
+    chown -R "$HSM_OWNER" "$WS" "$LOGS"
+    finished=1
+    exec setpriv --reuid="${HSM_OWNER%:*}" --regid="${HSM_OWNER#*:}" --clear-groups \
+        env HOME=/tmp HSM_PHASES="$rest" HSM_PASS="$npass" HSM_FAIL="$nfail" \
+        HSM_SKIP="$nskip" HSM_FAILED="$failed" sh "$here/in-container.sh"
 }
 
 do_build() {
@@ -169,8 +189,9 @@ RETRY="$here/retry"
 
 if phase apt; then check apt "$RETRY" apt-get update; fi
 if phase debs; then check debs do_debs; fi
-if phase copy; then check copy do_copy; fi
 if phase rosdep; then check rosdep do_rosdep; fi
+if [ -n "${HSM_OWNER:-}" ] && [ "$(id -u)" -eq 0 ]; then drop_to_owner; fi
+if phase copy; then check copy do_copy; fi
 
 ros_env
 if phase build; then check build do_build; fi

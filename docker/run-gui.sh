@@ -6,15 +6,19 @@
 #
 # Created on the first run, then started and entered: a login shell, or the given
 # command (rviz2, rqt, CyberiadaPro with --editor ...). Nothing is copied: the
-# original source dirs are bind-mounted read-write at their host paths, so git,
-# the editor and the plugin see the same paths inside and outside:
+# repos dir is bind-mounted read-write at its host path, so git, the editor and
+# the plugin see the same paths inside and outside:
 #
-#   the ros2 repos (--src)             default: the parent of hsm_robot_ros_api
-#   the colcon workspace (--ws)        default: the parent of the repos dir when it
-#                                      is named src (its build/ install/ log/),
-#                                      else the <name>-ws volume at ~/ros2_ws
-#   the Cyberiada sources (--sources)  default: ~/sources or ~/devel, if present
+#   the repos dir (--src)              the parent of hsm_robot_ros_api, wherever it
+#                                      is (~/ros2_ws/src, ~/sources)
+#   the colcon workspace               ~/ros2_ws in the <name>-ws volume, or a host
+#                                      dir (--ws); hsm-ros2-init links the ROS repos
+#                                      of the repos dir (a package.xml) into its src/
+#                                      and builds them, the others are left out
+#   the Cyberiada sources (--sources)  only when asked
 #   extra dirs (--mount DIR)           e.g. the diagrams
+#
+# A ROS repo cloned later into the repos dir needs only hsm-ros2-init again.
 #
 # The rest of the home dir (the editor settings, the installed plugin, history)
 # is the <name>-home volume. The mounts, the network and the devices are fixed when
@@ -34,9 +38,7 @@ NAME="hsm-ros2"
 IMAGE="$GUI_IMAGE"
 SRC_DIR="$SRC"
 WS=""
-WS_VOLUME=0
 SOURCES=""
-NO_SOURCES=0
 MOUNTS=""
 WAYLAND=0
 NVIDIA=0
@@ -51,11 +53,10 @@ usage() {
 usage: $0 [options] [--] [command [args...]]
   --name NAME      the container (default: $NAME; volumes NAME-home, NAME-ws)
   --image NAME     the gui image (default: $IMAGE)
-  --src DIR        the ros2 repos (default: $SRC)
-  --ws DIR         the colcon workspace (default: the parent of the repos dir)
-  --ws-volume      keep the workspace in the NAME-ws volume, not on the host
-  --sources DIR    the Cyberiada sources (default: ~/sources or ~/devel)
-  --no-sources     do not mount the Cyberiada sources
+  --src DIR        the repos dir (default: $SRC)
+  --ws DIR         the colcon workspace on the host (default: ~/ros2_ws in the
+                   NAME-ws volume)
+  --sources DIR    also mount the Cyberiada sources (e.g. ~/sources)
   --mount DIR      also mount DIR at its path (repeatable)
   --wayland        native Wayland Qt (rviz2 still needs QT_QPA_PLATFORM=xcb)
   --nvidia         the NVIDIA GPU (needs the nvidia container toolkit)
@@ -82,9 +83,7 @@ while [ $# -gt 0 ]; do
         --image) IMAGE="$2"; shift 2 ;;
         --src) SRC_DIR="$2"; shift 2 ;;
         --ws) WS="$2"; shift 2 ;;
-        --ws-volume) WS_VOLUME=1; shift ;;
         --sources) SOURCES="$2"; shift 2 ;;
-        --no-sources) NO_SOURCES=1; shift ;;
         --mount) MOUNTS="$MOUNTS${MOUNTS:+
 }$2"; shift 2 ;;
         --wayland) WAYLAND=1; shift ;;
@@ -105,8 +104,6 @@ while [ $# -gt 0 ]; do
 done
 
 need_docker
-NL='
-'
 # the host dir of the X cookie, outside the home volume (/run/hsm-ros2 inside)
 CACHE="$HOME/.cache/hsm-ros2/$NAME"
 XAUTH_FILE="$CACHE/Xauthority"
@@ -133,28 +130,20 @@ esac
 # --- the mounts --------------------------------------------------------------
 SRC_DIR=$(abspath "$SRC_DIR")
 if [ -z "$WS" ]; then
-    if [ "$(basename "$SRC_DIR")" = src ]; then
-        WS=$(dirname "$SRC_DIR")
-    else
-        WS="$HOME/ros2_ws"; WS_VOLUME=1
-    fi
-elif [ "$WS_VOLUME" -eq 0 ]; then
-    mkdir -p "$WS"
-    WS=$(abspath "$WS")
+    WS="$HOME/ros2_ws"; WS_VOLUME=1
 else
-    case "$WS" in /*) ;; *) die "--ws must be an absolute path with --ws-volume" ;; esac
+    mkdir -p "$WS"
+    WS=$(abspath "$WS"); WS_VOLUME=0
 fi
-if [ "$NO_SOURCES" -eq 0 ]; then
-    if [ -z "$SOURCES" ]; then
-        for d in "$HOME/sources" "$HOME/devel"; do
-            if [ -d "$d" ]; then SOURCES=$d; break; fi
-        done
-    fi
-    [ -z "$SOURCES" ] || SOURCES=$(abspath "$SOURCES")
-fi
+[ -z "$SOURCES" ] || SOURCES=$(abspath "$SOURCES")
+
+# the repos dir, whose ROS repos hsm-ros2-init links and builds, and this docker
+# dir (hsm-ros2-init runs from here)
+REPOS=$(ros2_repos "$SRC_DIR")
+[ -n "$REPOS" ] || echo "warning: no ROS repos (package.xml) in $SRC_DIR yet" >&2
+binds="$SRC_DIR$NL$API_REPO"
 
 # the bind-mounted dirs, without the ones another one already holds
-binds="$SRC_DIR"
 [ "$WS_VOLUME" -eq 1 ] || binds="$binds$NL$WS"
 [ -z "$SOURCES" ] || binds="$binds$NL$SOURCES"
 oldifs=$IFS; IFS=$NL; set -f
@@ -188,7 +177,7 @@ create() {
         set -- "$@" -v "$XDG_RUNTIME_DIR:$XDG_RUNTIME_DIR"
     fi
     if [ "$NVIDIA" -eq 1 ]; then set -- "$@" --gpus all -e NVIDIA_DRIVER_CAPABILITIES=all; fi
-    set -- "$@" -e HSM_ROS2_WS="$WS" -e HSM_ROS2_SRC="$SRC_DIR"
+    set -- "$@" -e HSM_ROS2_WS="$WS" -e HSM_ROS2_SRC="$SRC_DIR" -e HSM_ROS2_DOCKER="$here"
     "$DOCKER" create "$@" "$IMAGE" >/dev/null
 }
 
@@ -225,7 +214,8 @@ if ! exists; then
     user=$("$DOCKER" image inspect -f '{{.Config.User}}' "$IMAGE" 2>/dev/null || true)
     [ "$user" = "$(id -un)" ] || echo "warning: $IMAGE was built for '$user', not $(id -un); rebuild it" >&2
     say "creating $NAME: workspace $WS$([ "$WS_VOLUME" -eq 0 ] || echo " (volume $NAME-ws)")"
-    printf '%s\n' "$BINDS" | sed 's/^/  /'
+    printf '%s\n' "$BINDS" | sed 's/^/  mount: /'
+    [ -z "$REPOS" ] || printf '%s\n' "$REPOS" | sed 's|^.*/|  ros repo: |'
     create
     "$DOCKER" start "$NAME" >/dev/null
     fix_owners

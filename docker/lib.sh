@@ -22,12 +22,27 @@ REQUIRED_DEBS="libhtreegeom libcyberiadaml libcyberiadamlpp python3-libcyberiada
 say() { printf '\n\033[1;34m== %s\033[0m\n' "$*"; }
 die() { printf '\033[1;31merror: %s\033[0m\n' "$*" >&2; exit 1; }
 
-# the docker dir lives in hsm_robot_ros_api; its parent holds the ros2 repos
+NL='
+'
+
+# the docker dir lives in hsm_robot_ros_api; its parent holds the ros2 repos (and
+# maybe other repos, e.g. the Cyberiada ones in ~/sources)
 if [ -n "${here:-}" ]; then
     API_REPO=$(cd "$here/.." && pwd)
     API_NAME=$(basename "$API_REPO")
     SRC=$(cd "$API_REPO/.." && pwd)
 fi
+
+# ros2_repos DIR: the ROS repos of DIR, one path per line: a package.xml at the top
+# or one level down, no COLCON_IGNORE; the other repos are not built
+ros2_repos() {
+    for _r in "$1"/*; do
+        [ -d "$_r" ] && [ ! -e "$_r/COLCON_IGNORE" ] || continue
+        if [ -f "$_r/package.xml" ] || ls "$_r"/*/package.xml >/dev/null 2>&1; then
+            printf '%s\n' "$_r"
+        fi
+    done
+}
 
 need_docker() {
     command -v "$DOCKER" >/dev/null 2>&1 || die "docker not found"

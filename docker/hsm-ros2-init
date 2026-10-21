@@ -1,7 +1,14 @@
 #!/bin/bash
 # -----------------------------------------------------------------------------
-# Build the mounted HSM-ROS2 workspace and install the CyberiadaPro hsm-ros2
-# plugin for the user (the gui container). The extra arguments go to colcon build.
+# Build the HSM-ROS2 workspace of the gui container and install the CyberiadaPro
+# hsm-ros2 plugin for the user. Run it again after cloning a new ROS repo.
+#
+# The ROS repos of the mounted repos dir ($HSM_ROS2_SRC: a package.xml, no
+# COLCON_IGNORE, see ros2_repos in lib.sh) are linked into $HSM_ROS2_WS/src, the
+# links of removed repos are pruned, the missing dependencies are installed by
+# rosdep (--no-rosdep skips it; they last until the container is recreated) and
+# the workspace is built. The other arguments go to colcon build. The image's
+# /usr/local/bin/hsm-ros2-init runs this script from the mounted repo.
 #
 # Copyright (C) 2026 Alexey Fedoseev <aleksey@fedoseev.net>
 #
@@ -10,16 +17,44 @@
 # -----------------------------------------------------------------------------
 set -eu
 
+here=$(cd "$(dirname "$0")" && pwd)
+. "$here/lib.sh"
+
+ROSDEP=1
+if [ "${1:-}" = --no-rosdep ]; then ROSDEP=0; shift; fi
+
 ws=${HSM_ROS2_WS:?the workspace is not set (run the container with run-gui.sh)}
-src=${HSM_ROS2_SRC:-$ws/src}
+src=${HSM_ROS2_SRC:?the repos dir is not set (run the container with run-gui.sh)}
+
+# src/<repo> -> the repo at its host path (unless the repo is mounted right there)
+mkdir -p "$ws/src"
+for link in "$ws/src"/*; do
+    if [ -L "$link" ] && [ ! -e "$link" ]; then rm -f "$link"; echo "unlinked $link"; fi
+done
+while IFS= read -r repo; do
+    link="$ws/src/$(basename "$repo")"
+    if [ "$repo" = "$link" ]; then
+        continue
+    elif [ -L "$link" ] || [ ! -e "$link" ]; then
+        ln -sfn "$repo" "$link"
+    else
+        echo "warning: $link exists, not linked to $repo" >&2
+    fi
+done < <(ros2_repos "$src")
+echo "ros repos: $(cd "$ws/src" && echo *)"
 
 set +u
 . "/opt/ros/$ROS_DISTRO/setup.bash"
 set -u
 
-mkdir -p "$ws"
+if [ "$ROSDEP" -eq 1 ]; then
+    [ -d "$HOME/.ros/rosdep/sources.cache" ] || "$here/retry" rosdep update --rosdistro "$ROS_DISTRO"
+    "$here/retry" sudo apt-get update
+    "$here/retry" rosdep install --from-paths "$ws/src" --ignore-src -y -r --rosdistro "$ROS_DISTRO"
+fi
+
 cd "$ws"
-colcon build --base-paths "$src" "$@"
+colcon build --base-paths src "$@"
 
 set +u
 . "$ws/install/setup.bash"

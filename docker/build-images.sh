@@ -115,7 +115,7 @@ if wanted gui && fresh "$GUI_IMAGE"; then
     need_image "$DEV_IMAGE"
     [ "$(id -u)" -ne 0 ] || die "build the gui image as the everyday user, not root"
     mkdir -p "$ctx/gui"
-    cp "$here/gui/Dockerfile" "$here/hsm-ros2-init" "$ctx/gui/"
+    cp "$here/gui/Dockerfile" "$ctx/gui/"
     # shellcheck disable=SC2086
     build_image "$GUI_IMAGE" "$ctx/gui" $common --build-arg "BASE_IMAGE=$DEV_IMAGE" \
         --build-arg "USERNAME=$(id -un)" --build-arg "USER_UID=$(id -u)" \

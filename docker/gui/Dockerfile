@@ -36,7 +36,12 @@ RUN old=$(getent passwd "${USER_UID}" | cut -d: -f1); \
     && echo "${USERNAME} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/hsm-ros2 \
     && chmod 0440 /etc/sudoers.d/hsm-ros2
 
-COPY hsm-ros2-init /usr/local/bin/hsm-ros2-init
+# hsm-ros2-init of the mounted hsm_robot_ros_api (run-gui.sh sets HSM_ROS2_DOCKER),
+# so its changes need no image rebuild
+RUN printf '%s\n' '#!/bin/sh' \
+        'exec "${HSM_ROS2_DOCKER:?run the container with run-gui.sh}/hsm-ros2-init" "$@"' \
+        > /usr/local/bin/hsm-ros2-init \
+    && chmod 755 /usr/local/bin/hsm-ros2-init
 
 # rviz2 (Ogre) needs xcb; run-gui.sh --wayland switches the rest to wayland
 ENV QT_QPA_PLATFORM=xcb

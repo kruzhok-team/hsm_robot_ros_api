@@ -3,8 +3,8 @@
 Three images, each built on the previous one, and the scripts that drive them:
 
 ```
- <dist>/{libs/,ubuntu-24.04/,}*.deb            <repos>/{hsm_robot_ros_*,turtle_driver}
- (the Cyberiada toolchain)                     (the ros2 repos, never copied by hand)
+ <dist>/{libs/,ubuntu-24.04/,}*.deb            <repos dir>/<ROS repos> (a package.xml)
+ (the Cyberiada toolchain)                     (never copied by hand)
           │ baked into dev                              │ mounted
  build-images.sh ─► hsm-ros2-test:jazzy ─► test-docker.sh   clean: rosdep + .debs + build + L0..L4 + plugin
                     hsm-ros2-dev:jazzy  ─► build-docker.sh  build + L0..L4 (--shell: a dev shell)
@@ -21,15 +21,16 @@ Three images, each built on the previous one, and the scripts that drive them:
 | `test-docker.sh` | builds and tests from scratch in a disposable test container. |
 | `run-gui.sh` | the everyday persistent container on the host display. |
 | `in-container.sh` | the build/test phases, run inside the dev and test containers. |
-| `lib.sh` | the common part of the scripts: names, the dist lookup, the .deb staging. |
+| `lib.sh` | the common part of the scripts: names, the ROS repo discovery, the dist lookup, the .deb staging. |
 | `hsm-ros2-env.sh` | sources ROS 2 and `$HSM_ROS2_WS/install` in every shell of the images. |
 | `retry` | repeats a failing network command (in the images: `/usr/local/bin/retry`). |
-| `hsm-ros2-init` | (gui) builds the workspace and installs the CyberiadaPro `hsm-ros2` plugin. |
+| `hsm-ros2-init` | (gui) links the ROS repos, installs their deps, builds the workspace, installs the CyberiadaPro `hsm-ros2` plugin; the image runs it from the mounted repo. |
 
 ## Prerequisites
 
 - Docker with BuildKit (buildx) on a Linux host, the default builder (it sees the local base images).
-- The ros2 repos side by side (the parent of `hsm_robot_ros_api`, e.g. `~/ros2_ws/src`).
+- The ROS repos side by side in the repos dir, the parent of `hsm_robot_ros_api` (e.g.
+  `~/ros2_ws/src`, or `~/sources` next to the Cyberiada repos).
 - The Cyberiada toolchain .debs, built by `CyberiadaHSM-Editor/packaging/build-linux-docker.sh`.
   The dist dir is `--dist DIR`, else `~/sources/dist`, `~/devel/dist`, then `../dist` of the repo;
   the .debs are taken from its `libs/`, `ubuntu-24.04/` and the dir itself (a later one wins).
@@ -45,6 +46,20 @@ Three images, each built on the previous one, and the scripts that drive them:
 
     docker/test-docker.sh                         # the clean test, RESULT jazzy PASS|FAIL
                                                   # logs: <dist>/test-logs/ros2-jazzy/
+
+### The ROS repos
+
+The ROS repos are found, not listed: a subdir of the repos dir with a `package.xml` at its top
+or one level down (`ros2_repos` in `lib.sh`). The other repos (the Cyberiada ones, `dist/`) are
+never mounted into the dev/test containers nor built; a `COLCON_IGNORE` in a repo leaves it out.
+A new ROS repo is cloned next to the others and is picked up by the next run:
+
+- `build-docker.sh`, `test-docker.sh`: mount the found repos read-only under `/src`; rosdep
+  installs their dependencies missing in the image (as root), then the build and the tests run
+  as the host user (the clean test as well);
+- in the gui container: `hsm-ros2-init` again (links, rosdep, build). No image rebuild, no
+  `--recreate`; the run-time deps last until the container is recreated, add them to
+  `dev/Dockerfile` and rebuild to make them permanent.
 
 ### A flaky network
 
@@ -75,11 +90,16 @@ same paths inside and outside:
 
 | host | in the container |
 |------|------------------|
-| the ros2 repos (`--src`) | same path |
-| the workspace (`--ws`, default the parent of `src`: its `build/ install/ log/`) | same path, or the `hsm-ros2-ws` volume (`--ws-volume`) |
-| the Cyberiada sources (`~/sources` or `~/devel`, `--sources`, `--no-sources`) | same path |
+| the repos dir (`--src`, default the parent of `hsm_robot_ros_api`) | same path |
+| the workspace | `~/ros2_ws` in the `hsm-ros2-ws` volume, or a host dir at its path (`--ws DIR`) |
+| the Cyberiada sources (`--sources DIR`, only when asked) | same path |
 | extra dirs, e.g. the diagrams (`--mount DIR`) | same path |
 | the rest of the home dir | the `hsm-ros2-home` volume (editor settings, the plugin, history) |
+
+`hsm-ros2-init` links the ROS repos of the repos dir into the workspace `src/`, so they may live
+in `~/ros2_ws/src` or in `~/sources` among the Cyberiada repos alike:
+
+    ~/ros2_ws/src/<ros repo> -> <repos dir>/<ros repo>      (links of removed repos are pruned)
 
 The display is the host one: `/tmp/.X11-unix` with the session X cookie (refreshed on every run),
 `/dev/dri` for OpenGL, `--ipc host` for the Qt/rviz2 shared memory, and the host network for the
@@ -89,4 +109,4 @@ No GPU: `--software-gl`; NVIDIA: `--nvidia` (the nvidia container toolkit). If t
 refuses the client: `xhost +SI:localuser:$USER` on the host.
 
 The mounts, the network and the devices are fixed at creation: change them with `--recreate`
-(the volumes stay). The gui image is built for the user who runs `build-images.sh`.
+(the volumes stay). A new ROS repo in the repos dir needs no recreate, only `hsm-ros2-init`. The gui image is built for the user who runs `build-images.sh`.

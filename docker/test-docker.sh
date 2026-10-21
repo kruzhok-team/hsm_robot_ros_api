@@ -60,6 +60,14 @@ rcf="$LOG_DIR/.rc"
 name="hsm-ros2-test-run"
 rev=$(git -C "$API_REPO" describe --always --dirty 2>/dev/null || echo unknown)
 
+# only the ROS repos (a package.xml, see ros2_repos in lib.sh), read-only under /src
+repos=$(ros2_repos "$SRC")
+[ -n "$repos" ] || die "no ROS repos (package.xml) in $SRC"
+set --
+oldifs=$IFS; IFS=$NL
+for r in $repos; do set -- "$@" -v "$r:/src/$(basename "$r"):ro"; done
+IFS=$oldifs
+
 trap '"$DOCKER" rm -f "$name" >/dev/null 2>&1; exit 130' INT TERM
 "$DOCKER" rm -f "$name" >/dev/null 2>&1 || true
 rm -f "$rcf"
@@ -67,11 +75,11 @@ rm -f "$rcf"
 say "testing $SRC with the toolchain of $DIST in $IMAGE -> $LOG_DIR"
 # dash has no pipefail: the exit code of docker run comes back through a file
 { "$DOCKER" run --rm --name "$name" \
-      -e HSM_PHASES="apt debs copy rosdep build tests plugin" -e HSM_TIERS="$TIERS" \
+      -e HSM_PHASES="apt debs rosdep copy build tests plugin" -e HSM_TIERS="$TIERS" \
       -e HSM_SRC=/src -e HSM_DIST=/dist -e HSM_LOGS=/logs \
       -e HSM_OWNER="$(id -u):$(id -g)" \
-      -v "$SRC":/src:ro -v "$DIST":/dist:ro -v "$LOG_DIR":/logs \
-      "$IMAGE" sh "/src/$API_NAME/docker/in-container.sh" || echo $? >"$rcf"; } 2>&1 | tee "$log"
+      "$@" -v "$here":/hsm-docker:ro -v "$DIST":/dist:ro -v "$LOG_DIR":/logs \
+      "$IMAGE" sh /hsm-docker/in-container.sh || echo $? >"$rcf"; } 2>&1 | tee "$log"
 rc=0
 [ ! -f "$rcf" ] || rc=$(cat "$rcf")
 rm -f "$rcf"
