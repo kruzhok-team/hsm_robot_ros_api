@@ -7,8 +7,9 @@ HSM Controller Node is generated from a HSM diagram. The diagram uses the robot 
 and events embedded into the diagram within the Pyrhon code. The HSM Controller Node is
 connected to the proxy objects (callers) incapsulated the ROS2 service calls to the
 processing nodes. Each processing node implements the particular object from the API. The
-events triggered by the objects are returned and processed by the HSM dispatcher (pysm is
-used in this version).
+events triggered by the objects are returned and processed by the HSM dispatcher - the
+Python HSM dispatcher `hsmd` (hsm-dispatcher-py) running the `hsmd.Machine` declared in the
+generated controller.
 
 Here is the architectural scheme of the API implementation:
 
