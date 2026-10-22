@@ -32,7 +32,10 @@ Three images, each built on the previous one, and the scripts that drive them:
 - Docker with BuildKit (buildx) on a Linux host, the default builder (it sees the local base images).
 - The ROS repos side by side in the repos dir, the parent of `hsm_robot_ros_api` (e.g.
   `~/ros2_ws/src`, or `~/sources` next to the Cyberiada repos).
-- The Cyberiada toolchain .debs, built by `CyberiadaHSM-Editor/packaging/build-linux-docker.sh`.
+- The Cyberiada toolchain .debs, built by `CyberiadaHSM-Editor/packaging/build-linux-docker.sh`:
+  the libraries (`libhtreegeom`, `libcyberiadaml`, `libcyberiadamlpp`), the python binding
+  `python3-libcyberiadamlpp`, the dispatcher `python3-hsm-dispatcher` (`hsmd`, which the generated
+  controllers run on) and `cyberiada-pro`. Rebuild the dev and gui images after a toolchain update.
   The dist dir is `--dist DIR`, else `~/sources/dist`, `~/devel/dist`, then `../dist` of the repo;
   the .debs are taken from its `libs/`, `ubuntu-24.04/` and the dir itself (a later one wins).
 

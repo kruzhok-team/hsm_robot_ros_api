@@ -183,7 +183,7 @@ The plugin is specified in `hsm_robot_ros_generator/docs/editor_plugin.md`.
 The framework is built, tested and used in three Ubuntu 24.04 / ROS 2 Jazzy images
 (`docker/`, see `docker/README.md`), each on the previous one:
 
-     dist/*.deb (Cyberiada toolchain)     the ROS repos (docker/ros2-repos; mounted)
+     dist/*.deb (toolchain, hsmd)         the ROS repos (docker/ros2-repos; mounted)
             |                                   |
      hsm-ros2-test  ROS core, colcon, rosdep  --> test-docker.sh   clean build + L0..L4
      hsm-ros2-dev   + deps, toolchain         --> build-docker.sh  build + L0..L4

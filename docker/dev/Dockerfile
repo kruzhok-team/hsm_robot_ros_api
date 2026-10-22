@@ -29,8 +29,9 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         python3-pytest python3-pytest-timeout python3-transforms3d \
         git gdb less vim-tiny"
 
-# the toolchain .debs, a layer of their own (they change more often); bind-mounted,
-# so they do not stay in the image
+# the toolchain .debs (the libraries, the python binding, the hsmd dispatcher of the
+# generated controllers, CyberiadaPro), a layer of their own (they change more
+# often); bind-mounted, so they do not stay in the image
 RUN --mount=type=bind,source=debs,target=/tmp/hsm-debs \
     --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \

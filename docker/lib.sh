@@ -16,8 +16,10 @@ DEV_IMAGE="hsm-ros2-dev:$ROS_DISTRO_NAME"
 GUI_IMAGE="hsm-ros2-gui:$ROS_DISTRO_NAME"
 DOCKER=${DOCKER:-docker}
 
-# the toolchain packages every image with the editor needs
-REQUIRED_DEBS="libhtreegeom libcyberiadaml libcyberiadamlpp python3-libcyberiadamlpp cyberiada-pro"
+# the toolchain packages every image with the editor needs; python3-hsm-dispatcher is
+# hsmd, the dispatcher the generated controllers run on
+REQUIRED_DEBS="libhtreegeom libcyberiadaml libcyberiadamlpp python3-libcyberiadamlpp
+               python3-hsm-dispatcher cyberiada-pro"
 
 say() { printf '\n\033[1;34m== %s\033[0m\n' "$*"; }
 die() { printf '\033[1;31merror: %s\033[0m\n' "$*" >&2; exit 1; }
