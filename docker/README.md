@@ -23,6 +23,7 @@ Three images, each built on the previous one, and the scripts that drive them:
 | `in-container.sh` | the build/test phases, run inside the dev and test containers. |
 | `lib.sh` | the common part of the scripts: names, the ROS repos, the dist lookup, the .deb staging. |
 | `ros2-repos` | the list of the ROS repos to mount and build (one per line). |
+| `rosdep.yaml` | the local rosdep keys: our packages (their .debs) and the Cyberiada toolchain packages. |
 | `hsm-ros2-env.sh` | sources ROS 2 and `$HSM_ROS2_WS/install` in every shell of the images. |
 | `retry` | repeats a failing network command (in the images: `/usr/local/bin/retry`). |
 | `hsm-ros2-init` | (gui) links the ROS repos, installs their deps, builds the workspace, installs the CyberiadaPro `hsm-ros2` plugin; the image runs it from the mounted repo. |
@@ -81,6 +82,35 @@ The network steps do not break the build at the first failure:
 
 The tiers are those of `hsm_robot_ros_tests/docs/hsm_robot_testing.md`: L0 linter, L1 unit (the
 generator), L2 node, L3 integration, L4 system (turtlesim, headless).
+
+## Debian packages
+
+The ROS packages are packaged the ROS way, with bloom (`ros-jazzy-<package>` .debs), in the
+dev container, and install-tested in a clean one:
+
+```
+ build-docker.sh --package      (root; the .debs owned by the user)
+   rosdep-local, rosdep, copy, then per package in the colcon topological order:
+     bloom-generate rosdebian + the package's packaging/debian/* (@ROS_DISTRO@ substituted)
+     apt-get build-dep; DEB_BUILD_OPTIONS=nocheck fakeroot debian/rules binary
+     apt-get install the .deb (the next package Build-Depends on it)
+   -> <dist>/ros2-jazzy/ros-jazzy-{hsm-interfaces,hsm-generator,hsm-test-utils,hsm-robot,
+                                   turtle-driver,hsm-tests}_*.deb
+ test-docker.sh --debs          (no sources: the declared Depends only)
+   the toolchain .debs, then the ros-jazzy .debs; the packages (ros2 pkg prefix), the
+   interfaces, the generator, the plugin in the editor's system folder
+```
+
+    docker/build-docker.sh --package          # --debs-dir DIR, --dist DIR
+    docker/test-docker.sh --debs              # logs: <dist>/test-logs/ros2-jazzy-debs/
+
+Our packages and the Cyberiada toolchain packages (`python3-libcyberiadamlpp`,
+`python3-hsm-dispatcher`, which `hsm_generator` depends on) are not in the rosdistro: their keys
+are in `rosdep.yaml`, registered before every rosdep run (`rosdep-local`). The CyberiadaPro
+plugin of the generator is linked into the editor's system folder by the
+`packaging/debian/links` of `hsm_robot_ros_generator`:
+
+    /usr/share/cyberiada-pro/plugins/hsm-ros2 -> /opt/ros/jazzy/share/hsm_generator/editor-plugin
 
 ## The everyday container
 

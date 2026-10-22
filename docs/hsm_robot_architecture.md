@@ -195,6 +195,10 @@ dependencies installed by rosdep. The
 everyday container is persistent and mounts the repos dir at its host path; its workspace links
 the ROS repos, so the editor, the plugin and colcon work there as on the host.
 
+The packages are also packaged with bloom (`build-docker.sh --package`): `ros-jazzy-<package>`
+.debs, install-tested in a clean container (`test-docker.sh --debs`). The generator .deb links
+its plugin into the system plugin folder of CyberiadaPro (`/usr/share/cyberiada-pro/plugins`).
+
 ## The Testing
 
 The ROS2 objects listed above are what makes the API testable. The modules never talk to a

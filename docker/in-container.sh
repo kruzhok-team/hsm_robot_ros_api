@@ -6,15 +6,21 @@
 # from copy on run as that user (setpriv), so the workspace stays the user's.
 #
 # Phases (HSM_PHASES), in this order:
-#   apt      apt-get update                                       (root)
-#   debs     install the toolchain .debs of $HSM_DIST              (root)
-#   rosdep   install the package.xml dependencies of $HSM_SRC      (root)
-#   copy     copy the read-only ROS repos of $HSM_SRC to $HSM_WS/src,
-#            without the VCS, the build output and the caches
-#   build    colcon build
-#   tests    the test tiers $HSM_TIERS (L0 linter, L1 unit, L2 node,
-#            L3 integration, L4 system)
-#   plugin   the CyberiadaPro hsm-ros2 plugin: found by the editor, installed
+#   apt          apt-get update                                   (root)
+#   debs         install the toolchain .debs of $HSM_DIST          (root)
+#   rosdep-local register the local rosdep keys (rosdep.yaml)      (root)
+#   rosdep       install the package.xml dependencies of $HSM_SRC  (root)
+#   copy         copy the read-only ROS repos of $HSM_SRC to $HSM_WS/src,
+#                without the VCS, the build output and the caches
+#   install      install the ros-<distro>-*.debs of $HSM_DEBS      (root)
+#   build        colcon build
+#   tests        the test tiers $HSM_TIERS (L0 linter, L1 unit, L2 node,
+#                L3 integration, L4 system)
+#   package      the bloom .debs of the packages, in the topological order,
+#                each installed for the next one, into $HSM_DEBS   (root)
+#   smoke        the installed .debs: the packages, the interfaces, the generator
+#   plugin       the CyberiadaPro hsm-ros2 plugin (of the build, or of the
+#                installed .debs): found by the editor, installed by the generator
 #
 # Every check prints PASS/FAIL/SKIP; the last line is
 #   RESULT jazzy PASS|FAIL|ERROR pass=N fail=N skip=N failed=...
@@ -37,6 +43,7 @@ DIST=${HSM_DIST:-/dist}
 LOGS=${HSM_LOGS:-$WS/logs}
 JOBS=${HSM_JOBS:-$(nproc 2>/dev/null || echo 2)}
 PACKAGES=${HSM_PACKAGES:-}
+DEBS=${HSM_DEBS:-/debs}
 DISTRO=${ROS_DISTRO:-$ROS_DISTRO_NAME}
 
 # headless, and the tests talk to their own nodes only
@@ -111,6 +118,12 @@ shutil.copytree(sys.argv[1], sys.argv[2], symlinks=True, ignore=shutil.ignore_pa
     done
 }
 
+# the keys of our packages and of the Cyberiada toolchain are not in the rosdistro
+do_rosdep_local() {
+    echo "yaml file://$here/rosdep.yaml" > /etc/ros/rosdep/sources.list.d/50-hsm-ros2.list
+    "$RETRY" rosdep update --rosdistro "$DISTRO"
+}
+
 # rosdep reads only the package.xml files: straight from the read-only repos
 do_rosdep() {
     "$RETRY" rosdep install --from-paths "$SRC" --ignore-src -y --rosdistro "$DISTRO"
@@ -120,7 +133,7 @@ do_rosdep() {
 drop_to_owner() {
     rest=""
     for p in $PHASES; do
-        case "$p" in apt|debs|rosdep) ;; *) rest="$rest${rest:+ }$p" ;; esac
+        case "$p" in apt|debs|rosdep-local|rosdep) ;; *) rest="$rest${rest:+ }$p" ;; esac
     done
     [ -n "$rest" ] || return 0
     chown -R "$HSM_OWNER" "$WS" "$LOGS"
@@ -166,15 +179,61 @@ do_tier() {
     return "$rc"
 }
 
-# the editor finds the plugin of the install tree, and its installer puts it into
-# the user plugin folder, where the editor finds it too
+# do_package_one NAME PATH: the bloom .deb of one package (nocheck: the tests ran in
+# the source build), installed, so the next package finds it as a Build-Depends.
+# The package's packaging/debian/* files (@ROS_DISTRO@ substituted) are added to
+# the generated debian/, e.g. the links of the editor plugin of hsm_generator
+do_package_one() {
+    cd "$WS/$2"
+    rm -rf debian obj-* .obj-*
+    bloom-generate rosdebian --ros-distro "$DISTRO"
+    for f in packaging/debian/*; do
+        [ -f "$f" ] || continue
+        sed "s/@ROS_DISTRO@/$DISTRO/g" "$f" >"debian/${f##*/}"
+    done
+    "$RETRY" apt-get build-dep -y ./
+    DEB_BUILD_OPTIONS=nocheck fakeroot debian/rules binary
+    deb=$(ls ../ros-"$DISTRO"-"$(echo "$1" | tr _ -)"_*.deb)
+    "$RETRY" apt-get install -y --no-install-recommends "$(cd .. && pwd)/${deb##*/}"
+    mv "$deb" "$DEBS/"
+}
+
+# the debs dir as the package list: ros-<distro>-<name>_... -> <name>
+installed_packages() {
+    for f in "$DEBS"/ros-"$DISTRO"-*.deb; do
+        n=${f##*/ros-"$DISTRO"-}
+        echo "${n%%_*}" | tr - _
+    done
+}
+
+do_install() {
+    ls "$DEBS"/ros-"$DISTRO"-*.deb >/dev/null || { echo "no ros-$DISTRO-*.deb in $DEBS"; return 1; }
+    rm -rf /tmp/hsm-rosdebs && mkdir -p /tmp/hsm-rosdebs
+    cp "$DEBS"/ros-"$DISTRO"-*.deb /tmp/hsm-rosdebs/
+    "$RETRY" apt-get install -y --no-install-recommends /tmp/hsm-rosdebs/*.deb
+}
+
+do_smoke() {
+    for p in $(installed_packages); do ros2 pkg prefix "$p"; done
+    ros2 interface list | grep -q 'hsm_interfaces/'
+    ros2 run hsm_generator hsm_generator --help >/dev/null
+}
+
+# do_plugin DIR [system]: the editor finds the plugin of the install tree DIR (the
+# build), or with "system" in its system folder, where the .deb links it; the
+# generator's installer puts it into the user plugin folder, found there too
 do_plugin() {
     command -v CyberiadaPro >/dev/null || { echo "CyberiadaPro not installed"; return 1; }
-    # --plugin-path is the folder holding the plugin folders
-    plugins="$WS/install/hsm_generator/share/hsm_generator"
+    plugins="$1"
     [ -f "$plugins/editor-plugin/plugin.json" ] || { echo "no plugin in $plugins"; return 1; }
-    CyberiadaPro --batch --list-plugins --plugin-path "$plugins" | tee /tmp/hsm-plugins.txt
-    grep -q 'hsm-ros2' /tmp/hsm-plugins.txt
+    if [ "${2:-}" = system ]; then
+        CyberiadaPro --batch --list-plugins | tee /tmp/hsm-plugins.txt
+        grep -q '^hsm-ros2 .* system' /tmp/hsm-plugins.txt
+    else
+        # --plugin-path is the folder holding the plugin folders
+        CyberiadaPro --batch --list-plugins --plugin-path "$plugins" | tee /tmp/hsm-plugins.txt
+        grep -q 'hsm-ros2' /tmp/hsm-plugins.txt
+    fi
     data=$(mktemp -d)
     XDG_DATA_HOME="$data" ros2 run hsm_generator hsm_generator --install-editor-plugin
     XDG_DATA_HOME="$data" CyberiadaPro --batch --list-plugins | tee /tmp/hsm-plugins.txt
@@ -190,9 +249,14 @@ RETRY="$here/retry"
 
 if phase apt; then check apt "$RETRY" apt-get update; fi
 if phase debs; then check debs do_debs; fi
+if phase rosdep-local; then check rosdep-local do_rosdep_local; fi
 if phase rosdep; then check rosdep do_rosdep; fi
-if [ -n "${HSM_OWNER:-}" ] && [ "$(id -u)" -eq 0 ]; then drop_to_owner; fi
+# packaging and installing stay root
+if [ -n "${HSM_OWNER:-}" ] && [ "$(id -u)" -eq 0 ] && ! phase package && ! phase install; then
+    drop_to_owner
+fi
 if phase copy; then check copy do_copy; fi
+if phase install; then check install do_install; fi
 
 ros_env
 if phase build; then check build do_build; fi
@@ -205,8 +269,34 @@ for t in $TIERS; do
     check "$t" do_tier "$t"
 done
 
+if phase package; then
+    check package-tools "$RETRY" apt-get install -y --no-install-recommends \
+        python3-bloom fakeroot dpkg-dev debhelper
+    mkdir -p "$DEBS"
+    rm -f "$DEBS"/ros-"$DISTRO"-*.deb
+    cd "$WS"
+    colcon list --topological-order --base-paths src >/tmp/hsm-pkgs
+    while IFS="$(printf '\t')" read -r name path _type; do
+        if failed_check copy || failed_check package-tools; then skip "package-$name" "no tools"; continue; fi
+        # the loop reads the list: the tools must not eat it
+        check "package-$name" do_package_one "$name" "$path" </dev/null
+    done </tmp/hsm-pkgs
+    [ -z "${HSM_OWNER:-}" ] || chown "$HSM_OWNER" "$DEBS"/*.deb 2>/dev/null || true
+fi
+
+if phase smoke; then
+    if failed_check install; then skip smoke "not installed"; else check smoke do_smoke; fi
+fi
+
 if phase plugin; then
-    if failed_check build; then skip plugin "no build"; else check plugin do_plugin; fi
+    if phase install; then
+        if failed_check install; then skip plugin "not installed"; \
+        else check plugin do_plugin "/opt/ros/$DISTRO/share/hsm_generator" system; fi
+    elif failed_check build; then
+        skip plugin "no build"
+    else
+        check plugin do_plugin "$WS/install/hsm_generator/share/hsm_generator"
+    fi
 fi
 
 finished=1

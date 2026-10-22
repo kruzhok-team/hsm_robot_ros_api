@@ -1,0 +1,19 @@
+# The local rosdep keys of the HSM-ROS2 packages (their bloom .debs) and of the
+# Cyberiada toolchain packages they depend on; none of them is in the public
+# rosdistro. Registered by in-container.sh and hsm-ros2-init (rosdep-local).
+hsm_interfaces:
+  ubuntu: [ros-jazzy-hsm-interfaces]
+hsm_robot:
+  ubuntu: [ros-jazzy-hsm-robot]
+hsm_generator:
+  ubuntu: [ros-jazzy-hsm-generator]
+hsm_test_utils:
+  ubuntu: [ros-jazzy-hsm-test-utils]
+hsm_tests:
+  ubuntu: [ros-jazzy-hsm-tests]
+turtle_driver:
+  ubuntu: [ros-jazzy-turtle-driver]
+python3-libcyberiadamlpp:
+  ubuntu: [python3-libcyberiadamlpp]
+python3-hsm-dispatcher:
+  ubuntu: [python3-hsm-dispatcher]

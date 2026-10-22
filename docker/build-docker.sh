@@ -10,7 +10,8 @@
 # discarded with the container unless --out keeps it (then the next run builds
 # incrementally).
 # The build and the tiers run by in-container.sh; --shell opens a dev shell
-# on the read-write sources instead.
+# on the read-write sources instead; --package builds the bloom .debs of the
+# packages (ros-jazzy-*) into <dist>/ros2-jazzy, see test-docker.sh --debs.
 #
 # Copyright (C) 2026 Alexey Fedoseev <aleksey@fedoseev.net>
 #
@@ -28,6 +29,9 @@ PACKAGES=""
 JOBS=$(nproc 2>/dev/null || echo 2)
 OUT=""
 SHELL_MODE=0
+PACKAGE=0
+DIST_ARG=""
+DEBS_DIR=""
 IMAGE="$DEV_IMAGE"
 
 usage() {
@@ -39,6 +43,9 @@ usage: $0 [options]
   --jobs N           parallel build jobs (default: $JOBS)
   --out DIR          keep the workspace (src copy, build, install, logs) in DIR
   --shell            an interactive shell in the dev image, sources read-write
+  --package          build the bloom .debs of the packages instead of testing
+  --debs-dir DIR     where the .debs go (default: <dist>/ros2-$ROS_DISTRO_NAME)
+  --dist DIR         the dist dir (default: ~/sources/dist, ~/devel/dist, ../dist)
   --image NAME       the dev image (default: $IMAGE)
   -h, --help         this help
 
@@ -54,6 +61,9 @@ while [ $# -gt 0 ]; do
         --jobs) JOBS="$2"; shift 2 ;;
         --out) OUT="$2"; shift 2 ;;
         --shell) SHELL_MODE=1; shift ;;
+        --package) PACKAGE=1; shift ;;
+        --debs-dir) DEBS_DIR="$2"; shift 2 ;;
+        --dist) DIST_ARG="$2"; shift 2 ;;
         --image) IMAGE="$2"; shift 2 ;;
         -h|--help) usage; exit 0 ;;
         *) echo "unknown option: $1" >&2; usage; exit 2 ;;
@@ -84,8 +94,18 @@ if [ "$SHELL_MODE" -eq 1 ]; then
         "$@" -w "$SRC" "$IMAGE" bash -l
 fi
 
-phases="apt rosdep copy build"
+phases="apt rosdep-local rosdep copy build"
 [ "$TEST" -eq 0 ] || phases="$phases tests"
+
+# --package: the .debs (root all the way: each one is installed for the next)
+if [ "$PACKAGE" -eq 1 ]; then
+    if [ -z "$DEBS_DIR" ]; then find_dist "$DIST_ARG"; DEBS_DIR="$DIST/ros2-$ROS_DISTRO_NAME"; fi
+    mkdir -p "$DEBS_DIR"
+    DEBS_DIR=$(cd "$DEBS_DIR" && pwd)
+    phases="apt rosdep-local rosdep copy package"
+    set -- "$@" -v "$DEBS_DIR:/debs"
+    say "packaging into $DEBS_DIR"
+fi
 
 # the kept workspace, if any
 ws=/tmp/hsm-ws
