@@ -178,6 +178,19 @@ environment, so the whole cycle stays in the editor:
 
 The plugin is specified in `hsm_robot_ros_generator/docs/editor_plugin.md`.
 
+The `hsm-turtle` plugin ("HSM Turtle", `turtle_driver/editor-plugin`) runs the diagram as the
+behaviour of the turtle of turtlesim, through the same adapter:
+
+     CyberiadaPro                hsm-turtle plugin             ROS2
+    +-------------+  check    +------------------+         +------------------------------+
+    |  diagram    | --------> | hsm_turtle_run   | ------> | diagnostics + turtle warnings|
+    |  (.graphml) |  generate | hsm_generator -o | ------> | WS/src/hsm_controller        |
+    |             |  run      | hsm_turtle_run   | ------> | build, turtlesim window,     |
+    |             |           |                  |         |  TRACE/<name>.csv, .svg      |
+    +-------------+           +------------------+         +------------------------------+
+
+It is specified in `turtle_driver/docs/editor_plugin.md`.
+
 ## The Containers
 
 The framework is built, tested and used in three Ubuntu 24.04 / ROS 2 Jazzy images
