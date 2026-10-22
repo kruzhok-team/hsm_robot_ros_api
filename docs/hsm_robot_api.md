@@ -1,5 +1,16 @@
 # ROS2 HSM Robot API Interface Specification
 
+A diagram uses a module after declaring it as a component named after the module, one
+formal comment a module (the generator's `docs/diagram_comments.md`):
+
+```
+CGML_COMPONENT Navigation
+type/ Navigation
+```
+
+The code calls the module by its name (`Navigation.move_to_point(1, 2)`), the triggers name
+its events as they are (`MOVE_COMPLETED/`). Navigation implies Wheels.
+
 ## Navigation Module
 
 `Navigation` module is the high-level movement control interface. It collects and uses knowledge
