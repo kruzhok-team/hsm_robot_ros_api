@@ -1,11 +1,11 @@
 #!/bin/bash
 # -----------------------------------------------------------------------------
 # Build the HSM-ROS2 workspace of the gui container and install the CyberiadaPro
-# hsm-ros2 plugin for the user. Run it again after cloning a new ROS repo.
+# hsm-ros2 plugin for the user. Run it again after adding a ROS repo.
 #
-# The ROS repos of the mounted repos dir ($HSM_ROS2_SRC: a package.xml, no
-# COLCON_IGNORE, see ros2_repos in lib.sh) are linked into $HSM_ROS2_WS/src, the
-# links of removed repos are pruned, the missing dependencies are installed by
+# The ROS repos of the mounted repos dir ($HSM_ROS2_SRC: the ros2-repos list and
+# $HSM_ROS2_REPOS, see ros2_repos in lib.sh) are linked into $HSM_ROS2_WS/src, the
+# links of the repos no longer listed are pruned, the missing dependencies are installed by
 # rosdep (--no-rosdep skips it; they last until the container is recreated) and
 # the workspace is built. The other arguments go to colcon build. The image's
 # /usr/local/bin/hsm-ros2-init runs this script from the mounted repo.
@@ -26,12 +26,17 @@ if [ "${1:-}" = --no-rosdep ]; then ROSDEP=0; shift; fi
 ws=${HSM_ROS2_WS:?the workspace is not set (run the container with run-gui.sh)}
 src=${HSM_ROS2_SRC:?the repos dir is not set (run the container with run-gui.sh)}
 
-# src/<repo> -> the repo at its host path (unless the repo is mounted right there)
+# src/<repo> -> the repo at its host path (unless the repo is mounted right there);
+# a link to a repo not listed (any more) goes
+repos=$(ros2_repos "$src")
 mkdir -p "$ws/src"
 for link in "$ws/src"/*; do
-    if [ -L "$link" ] && [ ! -e "$link" ]; then rm -f "$link"; echo "unlinked $link"; fi
+    if [ -L "$link" ] && ! grep -qxF "$(readlink "$link")" <<< "$repos"; then
+        rm -f "$link"; echo "unlinked $link"
+    fi
 done
 while IFS= read -r repo; do
+    [ -n "$repo" ] || continue
     link="$ws/src/$(basename "$repo")"
     if [ "$repo" = "$link" ]; then
         continue
@@ -40,7 +45,7 @@ while IFS= read -r repo; do
     else
         echo "warning: $link exists, not linked to $repo" >&2
     fi
-done < <(ros2_repos "$src")
+done <<< "$repos"
 echo "ros repos: $(cd "$ws/src" && echo *)"
 
 set +u

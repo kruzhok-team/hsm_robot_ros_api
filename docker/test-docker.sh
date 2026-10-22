@@ -60,9 +60,9 @@ rcf="$LOG_DIR/.rc"
 name="hsm-ros2-test-run"
 rev=$(git -C "$API_REPO" describe --always --dirty 2>/dev/null || echo unknown)
 
-# only the ROS repos (a package.xml, see ros2_repos in lib.sh), read-only under /src
+# only the ROS repos (the ros2-repos list and $HSM_ROS2_REPOS), read-only under /src
 repos=$(ros2_repos "$SRC")
-[ -n "$repos" ] || die "no ROS repos (package.xml) in $SRC"
+[ -n "$repos" ] || die "no ROS repos of $here/ros2-repos in $SRC"
 set --
 oldifs=$IFS; IFS=$NL
 for r in $repos; do set -- "$@" -v "$r:/src/$(basename "$r"):ro"; done

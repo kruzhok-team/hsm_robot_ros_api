@@ -1,0 +1,8 @@
+# The ROS repos of the repos dir (the parent of hsm_robot_ros_api), one per line:
+# the docker scripts mount, link and build only these, nothing else is scanned.
+# More repos: add a line here, or name them in $HSM_ROS2_REPOS (space-separated).
+hsm_robot_ros_interfaces
+hsm_robot_ros_api
+hsm_robot_ros_generator
+hsm_robot_ros_tests
+turtle_driver

@@ -3,7 +3,7 @@
 Three images, each built on the previous one, and the scripts that drive them:
 
 ```
- <dist>/{libs/,ubuntu-24.04/,}*.deb            <repos dir>/<ROS repos> (a package.xml)
+ <dist>/{libs/,ubuntu-24.04/,}*.deb            <repos dir>/<ROS repos> (the ros2-repos list)
  (the Cyberiada toolchain)                     (never copied by hand)
           │ baked into dev                              │ mounted
  build-images.sh ─► hsm-ros2-test:jazzy ─► test-docker.sh   clean: rosdep + .debs + build + L0..L4 + plugin
@@ -21,7 +21,8 @@ Three images, each built on the previous one, and the scripts that drive them:
 | `test-docker.sh` | builds and tests from scratch in a disposable test container. |
 | `run-gui.sh` | the everyday persistent container on the host display. |
 | `in-container.sh` | the build/test phases, run inside the dev and test containers. |
-| `lib.sh` | the common part of the scripts: names, the ROS repo discovery, the dist lookup, the .deb staging. |
+| `lib.sh` | the common part of the scripts: names, the ROS repos, the dist lookup, the .deb staging. |
+| `ros2-repos` | the list of the ROS repos to mount and build (one per line). |
 | `hsm-ros2-env.sh` | sources ROS 2 and `$HSM_ROS2_WS/install` in every shell of the images. |
 | `retry` | repeats a failing network command (in the images: `/usr/local/bin/retry`). |
 | `hsm-ros2-init` | (gui) links the ROS repos, installs their deps, builds the workspace, installs the CyberiadaPro `hsm-ros2` plugin; the image runs it from the mounted repo. |
@@ -49,17 +50,18 @@ Three images, each built on the previous one, and the scripts that drive them:
 
 ### The ROS repos
 
-The ROS repos are found, not listed: a subdir of the repos dir with a `package.xml` at its top
-or one level down (`ros2_repos` in `lib.sh`). The other repos (the Cyberiada ones, `dist/`) are
-never mounted into the dev/test containers nor built; a `COLCON_IGNORE` in a repo leaves it out.
-A new ROS repo is cloned next to the others and is picked up by the next run:
+The ROS repos are listed, not searched for: `ros2-repos` names the five HSM-ROS2 repos of the
+repos dir, and `$HSM_ROS2_REPOS` (space-separated) adds more. Only the listed dirs are looked at,
+so a big `~/sources` is never scanned; the other repos (the Cyberiada ones, `dist/`) are neither
+mounted into the dev/test containers nor built. A `COLCON_IGNORE` in a listed repo leaves it out.
+A new ROS repo is cloned into the repos dir and added to the list (or to `$HSM_ROS2_REPOS`):
 
-- `build-docker.sh`, `test-docker.sh`: mount the found repos read-only under `/src`; rosdep
+- `build-docker.sh`, `test-docker.sh`: mount the listed repos read-only under `/src`; rosdep
   installs their dependencies missing in the image (as root), then the build and the tests run
   as the host user (the clean test as well);
-- in the gui container: `hsm-ros2-init` again (links, rosdep, build). No image rebuild, no
-  `--recreate`; the run-time deps last until the container is recreated, add them to
-  `dev/Dockerfile` and rebuild to make them permanent.
+- in the gui container: `hsm-ros2-init` again (links, rosdep, build; the links of repos no longer
+  listed are removed). No image rebuild, no `--recreate`; the run-time deps last until the
+  container is recreated, add them to `dev/Dockerfile` and rebuild to make them permanent.
 
 ### A flaky network
 
@@ -96,10 +98,10 @@ same paths inside and outside:
 | extra dirs, e.g. the diagrams (`--mount DIR`) | same path |
 | the rest of the home dir | the `hsm-ros2-home` volume (editor settings, the plugin, history) |
 
-`hsm-ros2-init` links the ROS repos of the repos dir into the workspace `src/`, so they may live
+`hsm-ros2-init` links the listed ROS repos of the repos dir into the workspace `src/`, so they may live
 in `~/ros2_ws/src` or in `~/sources` among the Cyberiada repos alike:
 
-    ~/ros2_ws/src/<ros repo> -> <repos dir>/<ros repo>      (links of removed repos are pruned)
+    ~/ros2_ws/src/<ros repo> -> <repos dir>/<ros repo>      (links of unlisted repos are pruned)
 
 The display is the host one: `/tmp/.X11-unix` with the session X cookie (refreshed on every run),
 `/dev/dri` for OpenGL, `--ipc host` for the Qt/rviz2 shared memory, and the host network for the
@@ -109,4 +111,4 @@ No GPU: `--software-gl`; NVIDIA: `--nvidia` (the nvidia container toolkit). If t
 refuses the client: `xhost +SI:localuser:$USER` on the host.
 
 The mounts, the network and the devices are fixed at creation: change them with `--recreate`
-(the volumes stay). A new ROS repo in the repos dir needs no recreate, only `hsm-ros2-init`. The gui image is built for the user who runs `build-images.sh`.
+(the volumes stay). A ROS repo added to the list needs no recreate, only `hsm-ros2-init`. The gui image is built for the user who runs `build-images.sh`.

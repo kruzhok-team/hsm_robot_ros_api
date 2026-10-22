@@ -102,7 +102,8 @@ do_debs() {
 do_copy() {
     rm -rf "$WS/src"
     mkdir -p "$WS/src"
-    for r in $(ros2_repos "$SRC"); do
+    for r in "$SRC"/*; do
+        [ -d "$r" ] || continue
         python3 -c "import shutil, sys
 shutil.copytree(sys.argv[1], sys.argv[2], symlinks=True, ignore=shutil.ignore_patterns(
     '.git', 'build', 'install', 'log', '__pycache__', '*.egg-info', '.pytest_cache'))" \

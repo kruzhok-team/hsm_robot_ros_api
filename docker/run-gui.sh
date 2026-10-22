@@ -13,12 +13,13 @@
 #                                      is (~/ros2_ws/src, ~/sources)
 #   the colcon workspace               ~/ros2_ws in the <name>-ws volume, or a host
 #                                      dir (--ws); hsm-ros2-init links the ROS repos
-#                                      of the repos dir (a package.xml) into its src/
-#                                      and builds them, the others are left out
+#                                      of the repos dir (the ros2-repos list) into
+#                                      its src/ and builds them, the others are left out
 #   the Cyberiada sources (--sources)  only when asked
 #   extra dirs (--mount DIR)           e.g. the diagrams
 #
-# A ROS repo cloned later into the repos dir needs only hsm-ros2-init again.
+# A ROS repo added later (a line in ros2-repos, or $HSM_ROS2_REPOS) needs only
+# hsm-ros2-init again.
 #
 # The rest of the home dir (the editor settings, the installed plugin, history)
 # is the <name>-home volume. The mounts, the network and the devices are fixed when
@@ -140,7 +141,7 @@ fi
 # the repos dir, whose ROS repos hsm-ros2-init links and builds, and this docker
 # dir (hsm-ros2-init runs from here)
 REPOS=$(ros2_repos "$SRC_DIR")
-[ -n "$REPOS" ] || echo "warning: no ROS repos (package.xml) in $SRC_DIR yet" >&2
+[ -n "$REPOS" ] || echo "warning: no ROS repos of $here/ros2-repos in $SRC_DIR yet" >&2
 binds="$SRC_DIR$NL$API_REPO"
 
 # the bind-mounted dirs, without the ones another one already holds
@@ -245,6 +246,7 @@ set -- -w "$wd" "$@"
 
 [ -z "${DISPLAY:-}" ] || set -- -e "DISPLAY=$DISPLAY" -e XAUTHORITY=/run/hsm-ros2/Xauthority "$@"
 [ -z "${ROS_DOMAIN_ID:-}" ] || set -- -e "ROS_DOMAIN_ID=$ROS_DOMAIN_ID" "$@"
+[ -z "${HSM_ROS2_REPOS:-}" ] || set -- -e "HSM_ROS2_REPOS=$HSM_ROS2_REPOS" "$@"
 [ "$SOFTGL" -eq 0 ] || set -- -e LIBGL_ALWAYS_SOFTWARE=1 "$@"
 if [ "$WAYLAND" -eq 1 ] && [ -n "${WAYLAND_DISPLAY:-}" ]; then
     set -- -e QT_QPA_PLATFORM=wayland -e "WAYLAND_DISPLAY=$WAYLAND_DISPLAY" \

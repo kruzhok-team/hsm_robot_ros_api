@@ -2,9 +2,9 @@
 # -----------------------------------------------------------------------------
 # Build and test the HSM-ROS2 packages in the dev image (hsm-ros2-dev:jazzy).
 #
-# Only the ROS repos next to hsm_robot_ros_api (a package.xml, see ros2_repos in
-# lib.sh) are mounted, read-only, and copied into the container workspace, so a
-# run never writes into the sources and a new ROS repo is picked up as it is. The
+# Only the ROS repos next to hsm_robot_ros_api (the ros2-repos list and
+# $HSM_ROS2_REPOS) are mounted, read-only, and copied into the container
+# workspace, so a run never writes into the sources. The
 # dependencies of the packages missing in the image are installed by rosdep (as
 # root); the build and the tests then run as the host user. The workspace is
 # discarded with the container unless --out keeps it (then the next run builds
@@ -65,7 +65,7 @@ need_image "$IMAGE"
 
 # the ROS repos, read-only under /src (or read-write at their paths for --shell)
 repos=$(ros2_repos "$SRC")
-[ -n "$repos" ] || die "no ROS repos (package.xml) in $SRC"
+[ -n "$repos" ] || die "no ROS repos of $here/ros2-repos in $SRC"
 printf '%s\n' "$repos" | sed 's|^.*/|  ros repo: |'
 set --
 oldifs=$IFS; IFS=$NL

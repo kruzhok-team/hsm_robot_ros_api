@@ -33,15 +33,17 @@ if [ -n "${here:-}" ]; then
     SRC=$(cd "$API_REPO/.." && pwd)
 fi
 
-# ros2_repos DIR: the ROS repos of DIR, one path per line: a package.xml at the top
-# or one level down, no COLCON_IGNORE; the other repos are not built
+# ros2_repos DIR: the ROS repos of DIR, one path per line: the ones named in
+# ros2-repos (next to this file) and $HSM_ROS2_REPOS; nothing else is scanned. A
+# missing one is reported, one with a COLCON_IGNORE is left out
 ros2_repos() {
-    for _r in "$1"/*; do
-        [ -d "$_r" ] && [ ! -e "$_r/COLCON_IGNORE" ] || continue
-        if [ -f "$_r/package.xml" ] || ls "$_r"/*/package.xml >/dev/null 2>&1; then
-            printf '%s\n' "$_r"
+    for _n in $(sed -e 's/#.*//' "$here/ros2-repos") ${HSM_ROS2_REPOS:-}; do
+        if [ ! -d "$1/$_n" ]; then
+            echo "warning: no ROS repo $_n in $1" >&2
+        elif [ ! -e "$1/$_n/COLCON_IGNORE" ]; then
+            printf '%s\n' "$1/$_n"
         fi
-    done
+    done | awk '!seen[$0]++'
 }
 
 need_docker() {
